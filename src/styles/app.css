@@ -1,0 +1,46 @@
+/* App styling — clean, professional enterprise look layered on Vuetify. */
+:root {
+  --pro-ink: #1a202c;
+  --pro-slate: #4a5568;
+  --pro-primary: #1f3a5f;
+  --pro-accent: #3b6ea5;
+  --pro-border: #cbd5e0;
+  --pro-bg: #f4f6f9;
+}
+
+html, body, #app { height: 100%; }
+body { background: var(--pro-bg); }
+
+/* Section / page headings: refined, not shouty. */
+.nf-heading {
+  font-weight: 700;
+  color: var(--pro-primary);
+  letter-spacing: .2px;
+}
+.pro-label {
+  text-transform: uppercase; letter-spacing: 1px;
+  font-size: 11px; color: var(--pro-slate); font-weight: 600;
+}
+
+/* reports data table */
+.reports-table thead th {
+  background: #eef1f6 !important;
+  color: var(--pro-primary) !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  letter-spacing: .3px;
+  border-bottom: 1px solid var(--pro-border) !important;
+}
+.reports-table tbody tr:hover { background: #f0f4fa !important; }
+
+/* trait grade selector chips */
+.trait-grade-btn { min-width: 52px; }
+
+/* subtle card polish */
+.pro-card { border: 1px solid var(--pro-border) !important; box-shadow: 0 1px 3px rgba(26,32,44,.06) !important; }
+
+/* ---- print (fallback only; real output goes through pdf-lib) ---- */
+@media print {
+  .no-print { display: none !important; }
+  html, body, #app { background: #fff !important; height: auto !important; }
+}
