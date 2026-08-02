@@ -10,6 +10,11 @@ import FitrepCanvasEditor from "./components/FitrepCanvasEditor.vue";
 
 const app = useAppStore();
 
+// Build stamp injected by vite.config.js (`define`). On a Pages deploy this is
+// package version + the incrementing workflow run number; locally, "-dev".
+const version = __APP_VERSION__;
+const commit = __APP_COMMIT__;
+
 // editor / preview dialog state
 const editorReport = ref(null);
 const previewReport = ref(null);
@@ -108,6 +113,12 @@ const menus = [
         <span class="app-wordmark">WEBNAVFIT</span>
         <span class="app-subtitle ms-3">Navy Evaluation Report System</span>
       </v-app-bar-title>
+      <template #append>
+        <v-chip size="small" variant="outlined" class="me-3 app-version"
+                :title="commit ? `build ${version} (${commit})` : `build ${version}`">
+          v{{ version }}
+        </v-chip>
+      </template>
     </v-app-bar>
 
     <!-- Menu bar -->
@@ -214,6 +225,9 @@ const menus = [
           summary-group management, FITREP/EVAL/Chief data entry, trait &amp; summary-group
           averaging, validation, and printing onto the official NAVPERS 1610/2 form.</p>
           <p class="text-caption text-medium-emphasis mt-2">Data model derived from NAVFIT98A v2.2.0.33. Preparation aid only.</p>
+          <p class="text-caption text-medium-emphasis">
+            Build {{ version }}<template v-if="commit"> · commit {{ commit }}</template>
+          </p>
         </v-card-text>
         <v-card-actions><v-spacer /><v-btn @click="showAbout=false">Close</v-btn></v-card-actions>
       </v-card>
@@ -232,4 +246,5 @@ const menus = [
 .app-menubar { border-bottom: 1px solid #cbd5e0; }
 .app-menu-btn { letter-spacing: .2px; font-weight: 600; color: #4a5568; }
 .app-statusbar { border-top: 1px solid #cbd5e0; min-height: 28px; }
+.app-version { font-variant-numeric: tabular-nums; letter-spacing: .3px; opacity: .85; }
 </style>

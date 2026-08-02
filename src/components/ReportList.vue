@@ -77,15 +77,22 @@ function periodOf(r) {
   return r.FromDate || r.ToDate ? `${r.FromDate || "?"} – ${r.ToDate || "?"}` : "—";
 }
 
-const rows = computed(() => app.state.reports.map((r) => ({
-  raw: r,
-  name: nameOf(r),
-  type: (REPORT_TYPES[r.ReportType] || {}).label || r.ReportType,
-  period: periodOf(r),
-  prom: promLabelById[Number(r.PromotionRecom) || 0] || "NOB",
-  avg: Calc.memberTraitAverage(r),
-  validated: r.IsValidated,
-})));
+const rows = computed(() => app.state.reports.map((r) => {
+  // Derive validation from the report itself rather than trusting the stored
+  // IsValidated flag, so records written before the flag was maintained (or
+  // imported from another database) still show the right state.
+  const v = Calc.validate(r);
+  return {
+    raw: r,
+    name: nameOf(r),
+    type: (REPORT_TYPES[r.ReportType] || {}).label || r.ReportType,
+    period: periodOf(r),
+    prom: promLabelById[Number(r.PromotionRecom) || 0] || "NOB",
+    avg: Calc.memberTraitAverage(r),
+    validated: v.ok,
+    errors: v.errors,
+  };
+}));
 
 const promCells = computed(() => {
   const s = app.promotionSummary.value;
@@ -133,8 +140,23 @@ async function confirmDelete(r) {
           {{ item.avg == null ? "—" : Calc.fmt(item.avg, 2) }}
         </template>
         <template #item.validated="{ item }">
-          <v-chip :color="item.validated ? 'success' : 'error'" size="small" variant="flat">
-            {{ item.validated ? "True" : "False" }}
+          <!-- Hovering a failing chip lists the blocking items, so "False" is
+               actionable instead of opaque. -->
+          <v-tooltip v-if="!item.validated" location="top" max-width="420">
+            <template #activator="{ props }">
+              <v-chip v-bind="props" color="error" size="small" variant="flat"
+                      prepend-icon="mdi-alert-circle-outline">
+                False
+              </v-chip>
+            </template>
+            <div class="text-caption"><b>{{ item.errors.length }} item(s) to resolve:</b></div>
+            <ul class="text-caption ms-3">
+              <li v-for="(e, i) in item.errors" :key="i">{{ e.message }}</li>
+            </ul>
+          </v-tooltip>
+          <v-chip v-else color="success" size="small" variant="flat"
+                  prepend-icon="mdi-check-circle-outline">
+            True
           </v-chip>
         </template>
         <template #item.name="{ item }">

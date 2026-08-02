@@ -77,13 +77,19 @@ async function deleteFolder(id) {
 async function newReportInGroup(type) {
   if (state.selectedFolderId == null) { toast("Select a summary group first."); return null; }
   const rep = newReport(type, state.selectedFolderId);
+  rep.IsValidated = Calc.validate(rep).ok;
   const id = await db.putReport(rep);
   rep.ReportID = id;
   await refreshReports();
   return rep;
 }
+// Every write re-derives IsValidated, so the Validated column can never drift
+// from the report's actual contents. (Previously the flag kept its `false`
+// default forever because only the unused validateReport() ever set it.)
 async function saveReport(report) {
-  await db.putReport({ ...report });
+  const rec = { ...report };
+  rec.IsValidated = Calc.validate(rec).ok;
+  await db.putReport(rec);
   await refreshReports();
 }
 async function deleteReport(id) {
@@ -103,14 +109,6 @@ async function autoSummary() {
   toast("Summary counts written to all reports in the group.");
 }
 
-async function validateReport(report) {
-  const res = Calc.validate(report);
-  report.IsValidated = res.ok;
-  await db.putReport({ ...report });
-  await refreshReports();
-  return res;
-}
-
 const selectedFolder = computed(() =>
   state.folders.find((f) => f.FolderID === state.selectedFolderId) || null);
 const summaryGroupAverage = computed(() => Calc.summaryGroupAverage(state.reports));
@@ -124,7 +122,7 @@ export function useAppStore() {
     init, toast, selectFolder,
     addFolder, renameFolder, deleteFolder,
     newReportInGroup, saveReport, deleteReport,
-    autoSummary, validateReport,
+    autoSummary,
     exportAll: db.exportAll, importAll: db.importAll, wipe: db.wipe,
   };
 }
