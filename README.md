@@ -5,7 +5,7 @@ evaluations — FITREP, EVAL, and Chief Eval — and print them onto the officia
 **NAVPERS 1610/2** form with pixel-exact fidelity. Everything runs in your
 browser; there is **no server and nothing is uploaded**.
 
-▶ **Live app: https://thepollywog.github.io/WEBNAVFIT/**
+▶ **Live app: https://thepollywog.github.io/webnavfit/**
 
 📖 **New here? Read the [User Guide](USER-GUIDE.md)** for step-by-step instructions.
 

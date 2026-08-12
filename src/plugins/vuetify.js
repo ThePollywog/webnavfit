@@ -1,48 +1,99 @@
-// Vuetify instance — clean, professional enterprise theme (light).
-import "vuetify/styles";
-import "@mdi/font/css/materialdesignicons.css";
 import { createVuetify } from "vuetify";
+import { aliases, mdi } from "vuetify/iconsets/mdi-svg";
+import "vuetify/styles";
+import { initialTheme } from "../composables/useAppTheme.js";
 
-// Restrained, corporate palette: slate ink, indigo primary, subtle surfaces.
-const proTheme = {
+// Shared design system with SALTDOG, the companion app: same palette, same
+// component defaults, same class names in styles/app.css. The two halves of the
+// same task (when your eval is due / drafting it) should not look like two
+// different products, so the theme below is kept byte-identical to SALTDOG's and
+// any change belongs in both.
+//
+// Navy carries structure; gold is an accent that never carries body text.
+//
+// Contrast notes (WCAG AA needs 4.5:1 for body text):
+//   dark  — gold #C8A951 on #0A1628 = 8.05:1 (AAA)
+//   light — navy #0A2E5C on #FFFFFF = 13.4:1 (AAA)
+//   light — the bright gold #C8A951 on white is only 2.27:1 and FAILS, so any
+//           gold-toned text in light mode uses the darkened #8A6D1F (4.86:1).
+//           `accent` stays bright but is only ever used for rules and borders.
+const saltLight = {
   dark: false,
   colors: {
-    background: "#f4f6f9",
-    surface: "#ffffff",
-    "surface-variant": "#e8ecf2",
-    "on-surface-variant": "#4a5568",
-    primary: "#1f3a5f",        // deep slate-blue
-    "primary-darken-1": "#152a45",
-    secondary: "#3b6ea5",      // accent blue
-    accent: "#3b6ea5",
-    error: "#c0392b",
-    info: "#3b6ea5",
-    success: "#2e7d4f",
-    warning: "#b7791f",
-    "on-primary": "#ffffff",
-    "on-secondary": "#ffffff",
-    "on-background": "#1a202c",
-    "on-surface": "#1a202c",
+    background: "#F4F6FA",
+    surface: "#FFFFFF",
+    "surface-variant": "#E7ECF3",
+    "on-surface-variant": "#3C4B60",
+    primary: "#0A2E5C",
+    "primary-darken-1": "#06203F",
+    secondary: "#8A6D1F",
+    accent: "#C8A951",
+    error: "#A82A22",
+    warning: "#8A5A00",
+    success: "#1E6B45",
+    info: "#1F4E79",
+    "on-background": "#141A22",
+    "on-surface": "#141A22",
   },
-  variables: {
-    "border-color": "#cbd5e0",
-    "border-opacity": 0.8,
-    "high-emphasis-opacity": 0.9,
-    "medium-emphasis-opacity": 0.65,
+  variables: { "border-color": "#C3CDDB", "border-opacity": 0.9 },
+};
+
+const saltDark = {
+  dark: true,
+  colors: {
+    background: "#0A1628",
+    surface: "#10203A",
+    "surface-variant": "#1A2E4A",
+    "on-surface-variant": "#B8C6D9",
+    primary: "#C8A951",
+    "primary-darken-1": "#A98C3C",
+    secondary: "#6FA3DC",
+    accent: "#C8A951",
+    error: "#F08A80",
+    warning: "#E0B34D",
+    success: "#5FCF97",
+    info: "#7FB6E8",
+    "on-background": "#E8EDF4",
+    "on-surface": "#E8EDF4",
+    "on-primary": "#0A1628",
   },
+  variables: { "border-color": "#2A4266", "border-opacity": 1 },
 };
 
 export default createVuetify({
+  // SVG icon paths, not the icon webfont: the whole typographic premise here is
+  // zero font downloads, and @mdi/font would have shipped 1.2 MB of woff2 to
+  // draw about twenty glyphs.
+  icons: { defaultSet: "mdi", aliases, sets: { mdi } },
   theme: {
-    defaultTheme: "proTheme",
-    themes: { proTheme },
+    // Resolved before mount, so a user who chose light mode never sees a dark
+    // flash on load.
+    defaultTheme: initialTheme(),
+    themes: { saltLight, saltDark },
   },
+  // Defaults chosen to read as a controlled government document rather than a
+  // consumer app: no ripples, square buttons, borders instead of shadows.
+  //
+  // Density is `compact` for inputs, not SALTDOG's `comfortable`: this app is a
+  // data-entry form of ~50 fields where SALTDOG's densest screen is a lookup
+  // table, and the extra 8px a row would have pushed the trait blocks below the
+  // fold. Everything else matches.
   defaults: {
-    VBtn: { style: "text-transform: none; letter-spacing: 0.2px;" },
+    global: { ripple: false },
+    VBtn: {
+      variant: "flat",
+      rounded: 0,
+      style: "text-transform:none; letter-spacing:.2px;",
+    },
+    VCard: { rounded: "sm", flat: true, border: true },
     VTextField: { variant: "outlined", density: "compact", hideDetails: "auto" },
-    VSelect: { variant: "outlined", density: "compact", hideDetails: "auto" },
     VTextarea: { variant: "outlined", density: "compact", hideDetails: "auto" },
-    VCard: { color: "surface" },
-    VAppBar: { flat: true },
+    VSelect: { variant: "outlined", density: "compact", hideDetails: "auto" },
+    VAutocomplete: { variant: "outlined", density: "compact", hideDetails: "auto" },
+    VChip: { rounded: "sm", variant: "tonal", size: "small" },
+    VAppBar: { flat: true, border: "b", density: "comfortable" },
+    VTabs: { density: "comfortable" },
+    VList: { density: "compact" },
+    VAlert: { variant: "tonal", rounded: "sm", density: "comfortable" },
   },
 });

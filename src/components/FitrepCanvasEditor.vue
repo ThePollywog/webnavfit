@@ -1,5 +1,15 @@
 <script setup>
 import { reactive, ref, computed, onMounted } from "vue";
+import {
+  mdiClose,
+  mdiDownload,
+  mdiFilePdfBox,
+  mdiFormTextbox,
+  mdiFormatText,
+  mdiMagnifyMinusOutline,
+  mdiMagnifyPlusOutline,
+  mdiSignatureFreehand,
+} from "@mdi/js";
 import FIELDS from "../lib/fields-blank.json";
 import * as FF from "../lib/fitrepFields.js";
 import * as Calc from "../lib/calc.js";
@@ -249,10 +259,10 @@ async function saveAndDownload() {
 <template>
   <v-dialog v-model="dialog" fullscreen scrollable @after-leave="emit('close')">
     <v-card class="d-flex flex-column" style="height:100vh">
-      <v-toolbar color="primary" density="comfortable" flat class="cv-bar">
-        <v-icon :icon="pdfMode ? 'mdi-file-pdf-box' : 'mdi-form-textbox'" size="20" class="ms-3" />
-        <v-toolbar-title style="font-weight:600">{{ title }}
-          <span class="text-caption ms-2" style="opacity:.85">
+      <v-toolbar color="surface" density="comfortable" flat class="cv-bar">
+        <v-icon :icon="pdfMode ? mdiFilePdfBox : mdiFormTextbox" size="20" color="primary" class="ms-4" />
+        <v-toolbar-title class="salt-heading text-subtitle-1 ms-1">{{ title }}
+          <span class="text-caption ms-2" style="opacity: 0.7">
             <template v-if="pdfMode">
               uploaded PDF ·
               <template v-if="hasPdfForm">edit fields, add text &amp; signatures</template>
@@ -262,28 +272,30 @@ async function saveAndDownload() {
           </span>
         </v-toolbar-title>
         <v-spacer />
-        <span v-if="!pdfMode" class="text-caption me-3">Member Avg: <b>{{ memberAvg == null ? "—" : Calc.fmt(memberAvg,2) }}</b></span>
-        <v-btn size="small" :variant="placing==='text' ? 'flat' : 'text'" :color="placing==='text' ? 'secondary' : undefined"
-               prepend-icon="mdi-format-text" @click="startPlace('text')">Add Text</v-btn>
-        <v-btn size="small" :variant="placing==='sig' ? 'flat' : 'text'" :color="placing==='sig' ? 'secondary' : undefined"
-               prepend-icon="mdi-signature-freehand" @click="startPlace('sig')">Add Signature</v-btn>
+        <span v-if="!pdfMode" class="text-caption me-3">
+          Member Avg: <b class="mono">{{ memberAvg == null ? "—" : Calc.fmt(memberAvg,2) }}</b>
+        </span>
+        <v-btn size="small" :variant="placing==='text' ? 'flat' : 'text'" :color="placing==='text' ? 'primary' : undefined"
+               :prepend-icon="mdiFormatText" @click="startPlace('text')">Add Text</v-btn>
+        <v-btn size="small" :variant="placing==='sig' ? 'flat' : 'text'" :color="placing==='sig' ? 'primary' : undefined"
+               :prepend-icon="mdiSignatureFreehand" @click="startPlace('sig')">Add Signature</v-btn>
         <v-divider vertical class="mx-2" />
-        <v-btn variant="text" icon="mdi-magnify-minus" @click="zoom = Math.max(0.6, zoom - 0.15)" />
-        <span class="text-caption mx-1">{{ Math.round(zoom*100) }}%</span>
-        <v-btn variant="text" icon="mdi-magnify-plus" @click="zoom = Math.min(2, zoom + 0.15)" />
-        <v-btn v-if="!pdfMode" variant="tonal" color="secondary" class="ms-3" @click="save(false)">Save</v-btn>
-        <v-btn variant="flat" color="secondary" class="ms-2" prepend-icon="mdi-download" @click="saveAndDownload">
+        <v-btn variant="text" :icon="mdiMagnifyMinusOutline" aria-label="Zoom out" @click="zoom = Math.max(0.6, zoom - 0.15)" />
+        <span class="mono text-caption mx-1">{{ Math.round(zoom*100) }}%</span>
+        <v-btn variant="text" :icon="mdiMagnifyPlusOutline" aria-label="Zoom in" @click="zoom = Math.min(2, zoom + 0.15)" />
+        <v-btn v-if="!pdfMode" variant="tonal" class="ms-3" @click="save(false)">Save</v-btn>
+        <v-btn variant="flat" color="primary" class="ms-2" :prepend-icon="mdiDownload" @click="saveAndDownload">
           {{ pdfMode ? "Download PDF" : "Save & PDF" }}
         </v-btn>
-        <v-btn variant="text" icon="mdi-close" class="ms-1" @click="dialog=false" />
+        <v-btn variant="text" :icon="mdiClose" class="ms-1" aria-label="Close editor" @click="dialog=false" />
       </v-toolbar>
 
       <div class="cv-scroll">
         <div v-if="loading" class="cv-loading">
-          <v-progress-circular indeterminate color="secondary" size="42" />
+          <v-progress-circular indeterminate color="primary" size="42" />
           <div class="mt-3">Rendering PDF…</div>
         </div>
-        <v-alert v-else-if="loadErr" type="warning" variant="tonal" class="ma-6">{{ loadErr }}</v-alert>
+        <v-alert v-else-if="loadErr" type="warning" class="ma-6">{{ loadErr }}</v-alert>
 
         <div class="cv-hint" v-if="placing">Click on the page to place the {{ placing==='sig' ? 'signature' : 'text' }}.</div>
         <div v-else-if="activeGroup" class="cv-hint">{{ FF.LABEL[activeGroup] || activeGroup }}</div>
@@ -374,52 +386,98 @@ async function saveAndDownload() {
 </template>
 
 <style scoped>
-.cv-bar { border-bottom: 2px solid #3b6ea5; }
-.cv-scroll { flex: 1; min-height: 0; overflow: auto; background: #4a4d55; padding: 24px; display: flex; flex-direction: column; align-items: center; gap: 24px; }
-.cv-loading { color: #e2e8f0; display: flex; flex-direction: column; align-items: center; margin-top: 12vh; font-size: 14px; }
-.cv-hint { position: sticky; top: 0; align-self: flex-start; background: #1f3a5f; color: #fff; font-size: 12px; padding: 3px 10px; border-radius: 4px; z-index: 5; }
-.cv-page { position: relative; background: #fff; box-shadow: 0 3px 16px rgba(0,0,0,.5); flex: 0 0 auto; }
+/*
+ * Two colour systems meet in this component and only one of them is themeable.
+ *
+ * The chrome (toolbar, alerts, buttons) is theme-driven like the rest of the app.
+ * Everything from `--cv-*` down is painted ON a sheet of white paper — the
+ * official form image, or a rendered page of someone's PDF — so it is fixed in
+ * both themes. Tying the field ink to `on-surface` would put pale grey text on
+ * white paper the moment dark mode is on, and the whole point of this editor is
+ * that what you see is what the PDF will contain.
+ *
+ * The values are the light theme's navy and green, so light mode is a seamless
+ * continuation of the palette and dark mode reads as a lit page on a dark desk.
+ */
+.cv-bar { border-bottom: 2px solid rgb(var(--v-theme-accent)); }
+
+.cv-page,
+.cv-scroll {
+  --cv-ink: #0A2E5C;          /* primary navy — what the PDF will show */
+  --cv-edit: 10, 46, 92;      /* the same navy, for field tints */
+  --cv-form: 30, 107, 69;     /* success green — an uploaded PDF's own fields */
+}
+
+/* The mat around the page: a fixed dark neutral in both themes. It frames white
+   paper, so it is not a themeable surface — `background` would leave a white
+   page on a near-white field in light mode with no visible page edge. */
+.cv-scroll {
+  flex: 1; min-height: 0; overflow: auto; background: #33383F; padding: 24px;
+  display: flex; flex-direction: column; align-items: center; gap: 24px;
+}
+.cv-loading {
+  color: #E8EDF4; display: flex; flex-direction: column; align-items: center;
+  margin-top: 12vh; font-size: 14px;
+}
+.cv-hint {
+  position: sticky; top: 0; align-self: flex-start; z-index: 5;
+  background: var(--cv-ink); color: #fff;
+  font-family: var(--salt-mono); font-size: 0.6875rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 10px;
+}
+.cv-page { position: relative; background: #fff; box-shadow: 0 3px 16px rgba(0, 0, 0, 0.5); flex: 0 0 auto; }
 .cv-bg { position: absolute; left: 0; top: 0; user-select: none; pointer-events: none; }
 
 .cv-input {
-  position: absolute; border: 1px solid transparent; background: rgba(59,110,165,0.06);
-  color: #0a1c3a; font-family: "Courier New", monospace; padding: 0; line-height: 1;
+  position: absolute; border: 1px solid transparent; background: rgba(var(--cv-edit), 0.06);
+  color: var(--cv-ink); font-family: var(--salt-mono); padding: 0; line-height: 1;
   outline: none; box-sizing: border-box;
 }
-.cv-input:hover { border-color: rgba(59,110,165,.5); background: rgba(59,110,165,.12); }
-.cv-input:focus { border-color: #1f3a5f; background: #fff; box-shadow: 0 0 0 2px rgba(31,58,95,.3); z-index: 10; }
+.cv-input:hover { border-color: rgba(var(--cv-edit), 0.5); background: rgba(var(--cv-edit), 0.12); }
+.cv-input:focus {
+  border-color: var(--cv-ink); background: #fff;
+  box-shadow: 0 0 0 2px rgba(var(--cv-edit), 0.3); z-index: 10;
+}
 /* multiline overlay: font-size + line-height come from inline style (per field);
    let it scroll if the text exceeds the block height. */
 .cv-area { resize: none; overflow: auto; white-space: pre-wrap; }
 
 .cv-mark {
   position: absolute; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; color: #000; font-weight: 700; box-sizing: border-box;
+  cursor: pointer; color: var(--cv-ink); font-weight: 700; box-sizing: border-box;
   border: 1px solid transparent;
 }
-.cv-mark:hover { background: rgba(59,110,165,.18); border-color: rgba(59,110,165,.5); }
-.cv-mark.on { color: #0a1c3a; }
+.cv-mark:hover { background: rgba(var(--cv-edit), 0.18); border-color: rgba(var(--cv-edit), 0.5); }
+/* A faint wash behind a marked box. The ✕ alone is thin at low zoom, and on a
+   form of forty checkboxes the tint is what makes the selected one findable
+   without reading every glyph. */
+.cv-mark.on { background: rgba(var(--cv-edit), 0.1); }
 .cv-mark span { font-size: 90%; line-height: 1; }
 
 .cv-computed {
   position: absolute; display: flex; align-items: center; justify-content: center;
-  font-family: "Courier New", monospace; color: #0a1c3a; font-weight: 700; pointer-events: none;
+  font-family: var(--salt-mono); color: var(--cv-ink); font-weight: 700; pointer-events: none;
 }
 
-/* uploaded-PDF AcroForm field overlays — a subtle green tint marks them fillable */
+/* Uploaded-PDF AcroForm overlays keep their own green tint. These are fields the
+   PDF itself declares, not ones this app placed, and green vs navy is the only
+   cue telling you which is which. */
 .cv-pdf-input {
-  position: absolute; border: 1px solid rgba(46,125,50,.45); background: rgba(46,125,50,.08);
-  color: #0a1c3a; font-family: Helvetica, Arial, sans-serif; padding: 0 2px; line-height: 1;
+  position: absolute; border: 1px solid rgba(var(--cv-form), 0.45); background: rgba(var(--cv-form), 0.08);
+  color: var(--cv-ink); font-family: var(--salt-sans); padding: 0 2px; line-height: 1;
   outline: none; box-sizing: border-box;
 }
-.cv-pdf-input:hover { background: rgba(46,125,50,.15); }
-.cv-pdf-input:focus { border-color: #1f3a5f; background: #fff; box-shadow: 0 0 0 2px rgba(31,58,95,.3); z-index: 10; }
+.cv-pdf-input:hover { background: rgba(var(--cv-form), 0.15); }
+.cv-pdf-input:focus {
+  border-color: var(--cv-ink); background: #fff;
+  box-shadow: 0 0 0 2px rgba(var(--cv-edit), 0.3); z-index: 10;
+}
 .cv-pdf-check {
   position: absolute; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; color: #0a1c3a; font-weight: 700; box-sizing: border-box;
-  border: 1px solid rgba(46,125,50,.5); background: rgba(46,125,50,.08);
+  cursor: pointer; color: var(--cv-ink); font-weight: 700; box-sizing: border-box;
+  border: 1px solid rgba(var(--cv-form), 0.5); background: rgba(var(--cv-form), 0.08);
 }
-.cv-pdf-check:hover { background: rgba(46,125,50,.2); }
+.cv-pdf-check:hover { background: rgba(var(--cv-form), 0.2); }
 .cv-pdf-check span { font-size: 90%; line-height: 1; }
 
 /* placing mode: page shows crosshair so it's clear you click to drop */
@@ -430,24 +488,25 @@ async function saveAndDownload() {
   position: absolute; cursor: move; white-space: nowrap;
   border: 1px dashed transparent; padding: 0;
 }
-.cv-ann:hover { border-color: rgba(59,110,165,.6); }
-.cv-ann.sel { border-color: #1f3a5f; border-style: solid; }
+.cv-ann:hover { border-color: rgba(var(--cv-edit), 0.6); }
+.cv-ann.sel { border-color: var(--cv-ink); border-style: solid; }
 .cv-ann-input {
   border: none; background: transparent; outline: none; padding: 0 1px;
-  color: #0a1c3a; font-family: Helvetica, Arial, sans-serif; line-height: 1.1;
+  color: var(--cv-ink); font-family: var(--salt-sans); line-height: 1.1;
   cursor: text; min-width: 40px;
 }
 .cv-ann.sig .cv-ann-input { font-family: "Times New Roman", Georgia, serif; font-style: italic; }
 .cv-ann.sel .cv-ann-input { background: #fff; }
 .cv-ann-tools {
   position: absolute; top: -26px; left: 0; display: flex; gap: 2px;
-  background: #1f3a5f; border-radius: 4px; padding: 2px;
+  background: var(--cv-ink); padding: 2px;
 }
 .cv-ann-btn {
   border: none; background: transparent; color: #fff; font-size: 11px; font-weight: 700;
-  width: 22px; height: 20px; border-radius: 3px; cursor: pointer;
+  width: 22px; height: 20px; cursor: pointer;
 }
-.cv-ann-btn:hover { background: rgba(255,255,255,.2); }
-.cv-ann-btn.active { background: #3b6ea5; }
-.cv-ann-btn.del { color: #ffb4ab; }
+.cv-ann-btn:hover { background: rgba(255, 255, 255, 0.2); }
+/* Gold for the engaged toggle — the accent, on the one control that has a state. */
+.cv-ann-btn.active { background: #C8A951; color: var(--cv-ink); }
+.cv-ann-btn.del { color: #F08A80; }
 </style>

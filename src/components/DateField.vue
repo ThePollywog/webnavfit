@@ -5,6 +5,7 @@
  * icon opens a v-date-picker that writes the value back in YYMMMDD format.
  */
 import { ref, computed } from "vue";
+import { mdiCalendarMonthOutline } from "@mdi/js";
 
 const props = defineProps({
   modelValue: { type: String, default: "" },
@@ -55,11 +56,12 @@ function onText(v) { emit("update:modelValue", v); }
     maxlength="7"
     placeholder="YYMmmDD"
     hint="e.g. 23Oct14"
+    class="salt-mono-field"
   >
     <template #append-inner>
       <v-menu v-model="menu" :close-on-content-click="false" location="bottom end">
         <template #activator="{ props: menuProps }">
-          <v-icon v-bind="menuProps" icon="mdi-calendar" style="cursor:pointer" title="Pick a date" />
+          <v-icon v-bind="menuProps" :icon="mdiCalendarMonthOutline" style="cursor: pointer" title="Pick a date" />
         </template>
         <v-date-picker
           v-model="pickerDate"

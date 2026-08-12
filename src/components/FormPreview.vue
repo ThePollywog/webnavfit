@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch } from "vue";
+import { mdiClose, mdiContentSave, mdiFileDocumentOutline, mdiFileEditOutline } from "@mdi/js";
 import { REPORT_TYPES } from "../lib/model.js";
 import { reportPdfBytes, downloadPdf } from "../lib/pdf.js";
 
@@ -61,21 +62,21 @@ onBeforeUnmount(() => { if (pdfUrl.value) URL.revokeObjectURL(pdfUrl.value); });
   <v-dialog v-model="dialog" fullscreen scrollable @after-leave="emit('close')">
     <v-card class="d-flex flex-column" style="height:100vh">
       <v-toolbar color="surface" density="comfortable" flat class="preview-bar no-print">
-        <v-icon icon="mdi-file-document-outline" color="primary" size="20" class="ms-3" />
-        <v-toolbar-title class="preview-title">{{ title }}</v-toolbar-title>
+        <v-icon :icon="mdiFileDocumentOutline" color="primary" size="20" class="ms-4" />
+        <v-toolbar-title class="salt-heading text-subtitle-1 ms-1">{{ title }}</v-toolbar-title>
         <v-spacer />
-        <v-btn variant="text" prepend-icon="mdi-file-edit-outline" class="me-2" @click="editOnForm">
+        <v-btn variant="text" :prepend-icon="mdiFileEditOutline" class="me-2" @click="editOnForm">
           Edit on Form
         </v-btn>
-        <v-btn variant="flat" color="primary" prepend-icon="mdi-content-save" @click="save" :disabled="!lastBytes">
+        <v-btn variant="flat" color="primary" :prepend-icon="mdiContentSave" @click="save" :disabled="!lastBytes">
           Save PDF
         </v-btn>
-        <v-btn variant="text" icon="mdi-close" class="ms-1" @click="close" />
+        <v-btn variant="text" :icon="mdiClose" class="ms-1" aria-label="Close preview" @click="close" />
       </v-toolbar>
 
       <div class="preview-body">
         <v-progress-linear v-if="loading" indeterminate color="primary" />
-        <v-alert v-if="error" type="error" variant="tonal" class="ma-4">{{ error }}</v-alert>
+        <v-alert v-if="error" type="error" class="ma-4">{{ error }}</v-alert>
         <iframe v-if="pdfUrl && !error" :src="pdfUrl" class="pdf-frame" title="FITREP preview" />
       </div>
     </v-card>
@@ -83,10 +84,12 @@ onBeforeUnmount(() => { if (pdfUrl.value) URL.revokeObjectURL(pdfUrl.value); });
 </template>
 
 <style scoped>
-.preview-bar { border-bottom: 1px solid rgb(var(--v-theme-outline, 200 200 200)); }
-.preview-title {
-  font-size: 14px; letter-spacing: .3px; font-weight: 600;
-}
-.preview-body { flex: 1; min-height: 0; background: #525659; position: relative; }
+/* Gold under the toolbar, as in the editors. */
+.preview-bar { border-bottom: 2px solid rgb(var(--v-theme-accent)); }
+/* The mat around the page stays a fixed dark neutral in both themes. It frames a
+   sheet of white paper, so it is not a themeable surface: tying it to
+   `background` would put a white page on a near-white field in light mode and
+   lose the page edge entirely. */
+.preview-body { flex: 1; min-height: 0; background: #33383F; position: relative; }
 .pdf-frame { width: 100%; height: 100%; border: 0; display: block; }
 </style>

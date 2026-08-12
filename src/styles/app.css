@@ -1,46 +1,248 @@
-/* App styling — clean, professional enterprise look layered on Vuetify. */
+/* Shared design system with SALTDOG, the companion app. Everything above the
+   "WEBNAVFIT" divider is common to both and should be changed in both; below it
+   are the rules only a report-entry app needs.
+
+   No webfont download: system UI stack for body, system mono for codes.
+   The uppercase letter-spaced mono "eyebrow" above card headings borrows the
+   stamped look of the source reference PDFs for zero KB. */
 :root {
-  --pro-ink: #1a202c;
-  --pro-slate: #4a5568;
-  --pro-primary: #1f3a5f;
-  --pro-accent: #3b6ea5;
-  --pro-border: #cbd5e0;
-  --pro-bg: #f4f6f9;
+  --salt-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  --salt-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
 }
 
-html, body, #app { height: 100%; }
-body { background: var(--pro-bg); }
+.v-application {
+  font-family: var(--salt-sans);
+}
 
-/* Section / page headings: refined, not shouty. */
-.nf-heading {
+body {
+  font-size: 15px;
+}
+
+/* Monospace for anything code-like: paygrades, URLs, phone numbers, acronyms. */
+.mono,
+.salt-url,
+.salt-code {
+  font-family: var(--salt-mono);
+  font-variant-ligatures: none;
+}
+
+.salt-url {
+  font-size: 0.8125rem;
+  word-break: break-all;
+}
+
+/* Section eyebrow — the stamped-document cue. */
+.salt-eyebrow {
+  font-family: var(--salt-mono);
+  font-size: 0.6875rem;
   font-weight: 700;
-  color: var(--pro-primary);
-  letter-spacing: .2px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.72;
+  display: block;
+  margin-bottom: 2px;
 }
-.pro-label {
-  text-transform: uppercase; letter-spacing: 1px;
-  font-size: 11px; color: var(--pro-slate); font-weight: 600;
+
+.salt-heading {
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
 }
 
-/* reports data table */
-.reports-table thead th {
-  background: #eef1f6 !important;
-  color: var(--pro-primary) !important;
-  font-weight: 700 !important;
-  font-size: 12px !important;
-  letter-spacing: .3px;
-  border-bottom: 1px solid var(--pro-border) !important;
+/* Never remove focus rings. Gold in dark, navy in light. */
+:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+  border-radius: 2px;
 }
-.reports-table tbody tr:hover { background: #f0f4fa !important; }
 
-/* trait grade selector chips */
-.trait-grade-btn { min-width: 52px; }
+/* Skip link — first focusable element, visible only when focused. */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 8px;
+  z-index: 3000;
+  padding: 10px 16px;
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary, 255, 255, 255));
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: 8px;
+}
 
-/* subtle card polish */
-.pro-card { border: 1px solid var(--pro-border) !important; box-shadow: 0 1px 3px rgba(26,32,44,.06) !important; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 
-/* ---- print (fallback only; real output goes through pdf-lib) ---- */
+/* Links keep an underline. On a reference site the underline is the affordance —
+   colour alone fails for colour-blind users and prints as identical black. */
+.salt-link {
+  color: rgb(var(--v-theme-primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.salt-link:hover {
+  text-decoration-thickness: 2px;
+}
+
+.salt-section:focus {
+  outline: none;
+}
+
+/* Vuetify's --v-border-opacity does double duty: border alpha AND the unfilled
+   track of v-progress-linear (which paints in currentColor). Both themes raise
+   it to ~1 for crisp table rules and dividers, and the side effect is that an
+   empty progress bar renders as a solid filled bar. Pin the track back to a
+   faint tint. */
+.v-progress-linear__background,
+.v-progress-linear__buffer {
+  opacity: 0.18;
+}
+
+/* Tables: compact, ruled, readable. */
+.salt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.salt-table th {
+  text-align: left;
+  font-family: var(--salt-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  background: rgb(var(--v-theme-surface-variant));
+  color: rgb(var(--v-theme-on-surface-variant));
+  border-bottom: 2px solid rgba(var(--v-border-color), 0.9);
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+.salt-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(var(--v-border-color), 0.55);
+  vertical-align: top;
+  line-height: 1.4;
+}
+.salt-table tbody tr:hover td {
+  background: rgba(var(--v-theme-on-surface), 0.035);
+}
+.salt-table .is-muted td {
+  opacity: 0.62;
+  font-style: italic;
+}
+
+/* Scroll wrapper so wide tables don't blow out the layout on mobile. */
+.salt-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @media print {
-  .no-print { display: none !important; }
-  html, body, #app { background: #fff !important; height: auto !important; }
+  .v-app-bar,
+  .v-navigation-drawer,
+  .salt-no-print,
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* ============================================================
+   WEBNAVFIT — rules the report-entry app adds to the system above.
+   ============================================================ */
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+/* Section band inside an editor card: the eyebrow treatment promoted to a full
+   header row, since a fifty-field form needs its blocks separated by more than
+   whitespace. The gold rule on the left is the accent's one structural job. */
+.salt-band {
+  font-family: var(--salt-mono);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  background: rgb(var(--v-theme-surface-variant));
+  color: rgb(var(--v-theme-on-surface-variant));
+  border-bottom: 1px solid rgba(var(--v-border-color), 0.9);
+  border-left: 3px solid rgb(var(--v-theme-accent));
+}
+
+/* A single figure and its label — summary-group average, RSCA, counts. */
+.salt-stat {
+  font-family: var(--salt-mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: rgb(var(--v-theme-primary));
+}
+
+/* v-data-table dressed as .salt-table. Global rather than scoped to the report
+   list: a scoped rule would need :deep() for every one of these selectors, and
+   Vuetify's own header styles carry enough specificity to need !important
+   regardless. The alternative was a hand-rolled table with no sorting. */
+.salt-data-table thead th {
+  font-family: var(--salt-mono) !important;
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase;
+  background: rgb(var(--v-theme-surface-variant)) !important;
+  color: rgb(var(--v-theme-on-surface-variant)) !important;
+  border-bottom: 2px solid rgba(var(--v-border-color), 0.9) !important;
+}
+.salt-data-table tbody tr:hover td {
+  background: rgba(var(--v-theme-on-surface), 0.035) !important;
+}
+
+/* Monospace a field's VALUE without taking its label with it. `class="mono"` on
+   a v-text-field lands on the root element, so the floating label inherits the
+   mono face too and the form grows two competing label styles. */
+.salt-mono-field input,
+.salt-mono-field textarea {
+  font-family: var(--salt-mono);
+  font-variant-ligatures: none;
+}
+
+/* Trait grade selector: equal-width square buttons that never wrap. */
+.trait-grade-btn {
+  min-width: 52px;
+}
+
+@media print {
+  html,
+  body,
+  #app {
+    background: #fff !important;
+    height: auto !important;
+  }
 }

@@ -1,5 +1,6 @@
 <script setup>
-import { reactive, computed, watch } from "vue";
+import { reactive, computed } from "vue";
+import { mdiClose, mdiEyeOutline, mdiFileDocumentEditOutline } from "@mdi/js";
 import * as Calc from "../lib/calc.js";
 import { REPORT_TYPES, traitsFor, OCCASIONS, REPORT_KINDS, DUTY_STATUS } from "../lib/model.js";
 import refdata from "../lib/refdata.js";
@@ -105,25 +106,25 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
   <v-dialog v-model="dialog.open" fullscreen scrollable transition="dialog-bottom-transition" @after-leave="emit('close')">
     <v-card color="background">
       <!-- header -->
-      <v-toolbar color="primary" density="comfortable" class="editor-bar">
-        <v-icon icon="mdi-file-document-edit-outline" size="20" class="ms-3" />
-        <v-toolbar-title>
-          <span style="font-weight:700;letter-spacing:.3px">{{ rt.label }}</span>
-          <span class="text-caption ms-2" style="opacity:.85">{{ rt.form }}</span>
+      <v-toolbar color="surface" density="comfortable" flat class="editor-bar">
+        <v-icon :icon="mdiFileDocumentEditOutline" size="20" color="primary" class="ms-4" />
+        <v-toolbar-title class="ms-1">
+          <span class="salt-heading">{{ rt.label }}</span>
+          <span class="salt-code text-caption ms-2" style="opacity: 0.7">{{ rt.form }}</span>
         </v-toolbar-title>
         <v-spacer />
-        <v-btn variant="tonal" color="primary" @click="save(false)">Save</v-btn>
+        <v-btn variant="text" :prepend-icon="mdiEyeOutline" @click="doPreview">Quick Preview</v-btn>
+        <v-btn variant="tonal" class="ms-2" @click="save(false)">Save</v-btn>
         <v-btn variant="flat" color="primary" class="ms-2" @click="save(true)">Save &amp; Close</v-btn>
-        <v-btn variant="text" class="ms-2" prepend-icon="mdi-eye" @click="doPreview">Quick Preview</v-btn>
-        <v-btn variant="text" icon="mdi-close" @click="doClose" />
+        <v-btn variant="text" :icon="mdiClose" class="ms-1" aria-label="Close editor" @click="doClose" />
       </v-toolbar>
 
-      <v-card-text class="pa-4" style="background:#f4f6f9">
+      <v-card-text class="pa-4">
         <!-- live status -->
-        <v-alert :type="validation.ok ? 'success' : 'warning'" variant="tonal" class="mb-4" border="start">
+        <v-alert :type="validation.ok ? 'success' : 'warning'" class="mb-4" border="start">
           <div class="d-flex align-center flex-wrap ga-4">
             <div><b>Member Trait Average:</b>
-              <span class="text-h6 ms-1">{{ memberAvg == null ? "NOB / ungraded" : Calc.fmt(memberAvg, 2) }}</span>
+              <span class="salt-stat text-h6 ms-1" style="color: inherit">{{ memberAvg == null ? "NOB / ungraded" : Calc.fmt(memberAvg, 2) }}</span>
             </div>
             <v-divider vertical />
             <div v-if="validation.ok"><b>✓ Ready to validate — no errors.</b></div>
@@ -135,8 +136,8 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
         </v-alert>
 
         <!-- Identity -->
-        <v-card class="mb-3" border flat>
-          <v-card-title class="nf-section-title">Member Identity</v-card-title>
+        <v-card class="mb-3">
+          <div class="salt-band">Member Identity</div>
           <v-card-text>
             <v-row dense>
               <v-col cols="12" md="4"><v-text-field v-model="form.LastName" label="1. Last Name" maxlength="27" /></v-col>
@@ -151,8 +152,8 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
         </v-card>
 
         <!-- Duty status + command -->
-        <v-card class="mb-3" border flat>
-          <v-card-title class="nf-section-title">Duty Status & Command (Blocks 5-9)</v-card-title>
+        <v-card class="mb-3">
+          <div class="salt-band">Duty Status & Command (Blocks 5-9)</div>
           <v-card-text>
             <v-radio-group v-model="statusModel" inline label="5. Duty Status" class="mb-2">
               <v-radio label="ACT" value="Active" /><v-radio label="TAR/FTS" value="TAR" />
@@ -168,8 +169,8 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
         </v-card>
 
         <!-- Occasion / period / observation -->
-        <v-card class="mb-3" border flat>
-          <v-card-title class="nf-section-title">Occasion, Period & Type (Blocks 10-21)</v-card-title>
+        <v-card class="mb-3">
+          <div class="salt-band">Occasion, Period & Type (Blocks 10-21)</div>
           <v-card-text>
             <v-radio-group v-model="occasionModel" inline label="Occasion for Report">
               <v-radio label="10. Periodic" value="Periodic" /><v-radio label="11. Detachment of Individual" value="DetInd" />
@@ -195,16 +196,16 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
                   maxlength="4"
                   hint="One letter per PFA cycle in the period, e.g. PBF"
                   persistent-hint
-                  style="font-family:'Courier New',monospace"
+                  class="salt-mono-field"
                 />
                 <div class="d-flex flex-wrap ga-1 mt-2">
                   <v-btn v-for="c in pfaCodes" :key="c.code" size="x-small" variant="tonal"
-                         color="primary" :title="c.label" @click="appendPfa(c.code)">
+                         class="mono" :title="c.label" @click="appendPfa(c.code)">
                     {{ c.code }}
                   </v-btn>
                   <v-btn size="x-small" variant="text" @click="clearPfa">Clear</v-btn>
                 </div>
-                <div class="text-caption text-medium-emphasis mt-1" style="line-height:1.4">
+                <div class="text-caption mt-1" style="line-height: 1.4; opacity: 0.72">
                   <div v-for="c in pfaCodes" :key="c.code">{{ c.label }}</div>
                 </div>
               </v-col>
@@ -214,8 +215,8 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
         </v-card>
 
         <!-- Reporting senior -->
-        <v-card class="mb-3" border flat>
-          <v-card-title class="nf-section-title">Reporting Senior & Address (Blocks 22-27, 44)</v-card-title>
+        <v-card class="mb-3">
+          <div class="salt-band">Reporting Senior & Address (Blocks 22-27, 44)</div>
           <v-card-text>
             <v-row dense>
               <v-col cols="12" md="6"><v-text-field v-model="form.ReportingSenior" label="22. Reporting Senior (Last, FI MI)" maxlength="18" /></v-col>
@@ -234,8 +235,8 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
         </v-card>
 
         <!-- Narrative -->
-        <v-card class="mb-3" border flat>
-          <v-card-title class="nf-section-title">Employment, Duties & Counseling (Blocks 28-32)</v-card-title>
+        <v-card class="mb-3">
+          <div class="salt-band">Employment, Duties & Counseling (Blocks 28-32)</div>
           <v-card-text>
             <v-textarea v-model="form.Achievements" label="28. Command Employment & Achievements" rows="3" auto-grow class="mb-2" />
             <v-textarea v-model="form.Duties" label="29. Primary / Collateral / Watchstanding Duties" rows="3" auto-grow class="mb-2" />
@@ -250,20 +251,20 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
         </v-card>
 
         <!-- Performance traits -->
-        <v-card class="mb-3" border flat>
-          <v-card-title class="nf-section-title">Performance Traits (Blocks 33-39)</v-card-title>
+        <v-card class="mb-3">
+          <div class="salt-band">Performance Traits (Blocks 33-39)</div>
           <v-card-text>
             <div v-for="(col, idx) in traitCols" :key="col" class="trait-row py-3">
               <div class="d-flex align-center flex-nowrap ga-4">
                 <div class="trait-label">
-                  <div style="font-weight:700;color:#1f3a5f">{{ (descriptors[idx] || {}).block || (33 + idx) }}. {{ col }}</div>
-                  <div class="text-body-2">{{ (descriptors[idx] || {}).title }}</div>
-                  <div class="text-caption text-medium-emphasis">{{ (descriptors[idx] || {}).sub }}</div>
+                  <div class="salt-eyebrow">{{ (descriptors[idx] || {}).block || (33 + idx) }}. {{ col }}</div>
+                  <div class="salt-heading text-body-2">{{ (descriptors[idx] || {}).title }}</div>
+                  <div class="text-caption" style="opacity: 0.72">{{ (descriptors[idx] || {}).sub }}</div>
                 </div>
                 <div class="d-flex flex-nowrap align-center ga-2 trait-grades">
                   <v-tooltip v-for="g in grades" :key="g.v" :text="descFor(descriptors[idx] || {}, g.v) || g.label" location="top" :disabled="!descFor(descriptors[idx] || {}, g.v)">
                     <template #activator="{ props }">
-                      <v-btn v-bind="props" class="trait-grade-btn"
+                      <v-btn v-bind="props" class="trait-grade-btn mono"
                              :color="Number(form[col]) === g.v ? 'primary' : undefined"
                              :variant="Number(form[col]) === g.v ? 'flat' : 'outlined'"
                              size="small" @click="form[col] = g.v">{{ g.label }}</v-btn>
@@ -276,8 +277,8 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
         </v-card>
 
         <!-- Comments + recommendations -->
-        <v-card class="mb-3" border flat>
-          <v-card-title class="nf-section-title">Recommendations & Comments (Blocks 40-41)</v-card-title>
+        <v-card class="mb-3">
+          <div class="salt-band">Recommendations & Comments (Blocks 40-41)</div>
           <v-card-text>
             <v-row dense class="mb-1">
               <v-col cols="12" md="6"><v-text-field v-model="form.RecommendA" label="40. Milestone Recommendation 1" maxlength="20" /></v-col>
@@ -286,13 +287,13 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
             <v-textarea v-model="form.Comments" label="41. Comments on Performance"
                         rows="12" :rules="[commentsRule]"
                         :hint="`${commentLines} / 18 lines · 92 chars/line`" persistent-hint
-                        style="font-family:'Courier New',monospace" />
+                        class="salt-mono-field" />
           </v-card-text>
         </v-card>
 
         <!-- Promotion + statement + signatures -->
-        <v-card class="mb-3" border flat>
-          <v-card-title class="nf-section-title">Promotion, Statement & Signatures (Blocks 42-47)</v-card-title>
+        <v-card class="mb-3">
+          <div class="salt-band">Promotion, Statement & Signatures (Blocks 42-47)</div>
           <v-card-text>
             <v-radio-group v-model.number="form.PromotionRecom" inline label="42. Promotion Recommendation">
               <v-radio v-for="p in promoRecom" :key="p.val" :label="`${p.label} (${p.val.toFixed(1)})`" :value="Math.round(p.val)" />
@@ -310,7 +311,7 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
         </v-card>
       </v-card-text>
 
-      <v-card-actions class="pa-3" style="border-top:1px solid #cbd5e0;background:#ffffff">
+      <v-card-actions class="pa-3 editor-actions">
         <v-spacer />
         <v-btn variant="flat" color="primary" @click="save(true)">Save &amp; Close</v-btn>
         <v-btn variant="text" @click="doClose">Cancel</v-btn>
@@ -320,13 +321,14 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
 </template>
 
 <style scoped>
-.editor-bar { border-bottom: 2px solid #3b6ea5; }
-.nf-section-title {
-  background: #eef1f6; color: #1f3a5f; border-left: 3px solid #3b6ea5;
-  text-transform: uppercase; letter-spacing: .5px; font-size: 12px; font-weight: 700;
-  padding: 8px 14px;
+/* Gold under the toolbar: the accent's structural job, matching the rule the
+   nav drawer and card headers draw. */
+.editor-bar { border-bottom: 2px solid rgb(var(--v-theme-accent)); }
+.editor-actions {
+  background: rgb(var(--v-theme-surface));
+  border-top: 1px solid rgba(var(--v-border-color), 0.9);
 }
-.trait-row { border-top: 1px solid #e2e8f0; overflow-x: auto; }
+.trait-row { border-top: 1px solid rgba(var(--v-border-color), 0.55); overflow-x: auto; }
 .trait-row:first-child { border-top: none; }
 /* fixed label so every trait's grade row starts at the same x, in a flat line */
 .trait-label { flex: 0 0 230px; width: 230px; }

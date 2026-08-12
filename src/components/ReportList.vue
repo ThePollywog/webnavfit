@@ -1,5 +1,16 @@
 <script setup>
 import { computed, ref } from "vue";
+import {
+  mdiAlertCircleOutline,
+  mdiCheckCircleOutline,
+  mdiDelete,
+  mdiDotsVertical,
+  mdiEyeOutline,
+  mdiFileEditOutline,
+  mdiFilePdfBox,
+  mdiPencil,
+  mdiPlus,
+} from "@mdi/js";
 import { useAppStore } from "../composables/useAppStore.js";
 import * as Calc from "../lib/calc.js";
 import { REPORT_TYPES } from "../lib/model.js";
@@ -62,11 +73,11 @@ const headers = [
 // Vuetify pattern for more than a couple of per-row actions.
 function rowActions(raw) {
   return [
-    { title: "Preview", icon: "mdi-eye", color: "primary", fn: () => emit("preview", raw) },
-    { title: "Edit", icon: "mdi-pencil", color: "primary", fn: () => emit("edit", raw) },
-    { title: "Edit on form", icon: "mdi-file-edit-outline", color: "primary", fn: () => editReportPdf(raw) },
-    { title: "Save PDF", icon: "mdi-file-pdf-box", color: "primary", fn: () => saveReportPdf(raw) },
-    { title: "Delete report", icon: "mdi-delete", color: "error", fn: () => confirmDelete(raw) },
+    { title: "Preview", icon: mdiEyeOutline, color: "primary", fn: () => emit("preview", raw) },
+    { title: "Edit", icon: mdiPencil, color: "primary", fn: () => emit("edit", raw) },
+    { title: "Edit on form", icon: mdiFileEditOutline, color: "primary", fn: () => editReportPdf(raw) },
+    { title: "Save PDF", icon: mdiFilePdfBox, color: "primary", fn: () => saveReportPdf(raw) },
+    { title: "Delete report", icon: mdiDelete, color: "error", fn: () => confirmDelete(raw) },
   ];
 }
 
@@ -110,42 +121,43 @@ async function confirmDelete(r) {
 <template>
   <div v-if="app.selectedFolder.value">
     <!-- Header + new-report CTAs -->
-    <div class="d-flex align-center mb-4 flex-wrap ga-2">
-      <h2 class="nf-heading text-h5" style="border-left:3px solid #3b6ea5;padding-left:10px">
-        {{ app.selectedFolder.value.FolderName }}
-      </h2>
+    <div class="d-flex align-center mb-6 flex-wrap ga-2">
+      <div>
+        <span class="salt-eyebrow">Summary Group</span>
+        <h2 class="salt-heading text-h5">{{ app.selectedFolder.value.FolderName }}</h2>
+      </div>
       <v-spacer />
-      <v-btn color="secondary" variant="outlined" prepend-icon="mdi-plus" @click="emit('new-report','FITREP')">New FITREP</v-btn>
-      <v-btn color="secondary" variant="outlined" prepend-icon="mdi-plus" @click="emit('new-report','EVAL')">New EVAL</v-btn>
-      <v-btn color="secondary" variant="outlined" prepend-icon="mdi-plus" @click="emit('new-report','CHIEF')">New Chief Eval</v-btn>
-      <v-btn color="primary" prepend-icon="mdi-file-pdf-box" :loading="savingGroup"
+      <v-btn variant="outlined" :prepend-icon="mdiPlus" @click="emit('new-report','FITREP')">New FITREP</v-btn>
+      <v-btn variant="outlined" :prepend-icon="mdiPlus" @click="emit('new-report','EVAL')">New EVAL</v-btn>
+      <v-btn variant="outlined" :prepend-icon="mdiPlus" @click="emit('new-report','CHIEF')">New Chief Eval</v-btn>
+      <v-btn color="primary" :prepend-icon="mdiFilePdfBox" :loading="savingGroup"
              :disabled="!app.state.reports.length" @click="saveGroupPdf">
         Save PDF
       </v-btn>
     </div>
 
     <!-- Reports table -->
-    <v-card class="mb-4" border flat>
+    <v-card class="mb-4">
       <v-data-table
-        class="reports-table"
+        class="salt-data-table"
         :headers="headers"
         :items="rows"
         :items-per-page="-1"
+        hide-default-footer
         density="comfortable"
         hover
         no-data-text="No reports. Use the New buttons above."
         @click:row="onRowClick"
       >
         <template #item.avg="{ item }">
-          {{ item.avg == null ? "—" : Calc.fmt(item.avg, 2) }}
+          <span class="mono">{{ item.avg == null ? "—" : Calc.fmt(item.avg, 2) }}</span>
         </template>
         <template #item.validated="{ item }">
           <!-- Hovering a failing chip lists the blocking items, so "False" is
                actionable instead of opaque. -->
           <v-tooltip v-if="!item.validated" location="top" max-width="420">
             <template #activator="{ props }">
-              <v-chip v-bind="props" color="error" size="small" variant="flat"
-                      prepend-icon="mdi-alert-circle-outline">
+              <v-chip v-bind="props" color="error" :prepend-icon="mdiAlertCircleOutline">
                 False
               </v-chip>
             </template>
@@ -154,24 +166,23 @@ async function confirmDelete(r) {
               <li v-for="(e, i) in item.errors" :key="i">{{ e.message }}</li>
             </ul>
           </v-tooltip>
-          <v-chip v-else color="success" size="small" variant="flat"
-                  prepend-icon="mdi-check-circle-outline">
+          <v-chip v-else color="success" :prepend-icon="mdiCheckCircleOutline">
             True
           </v-chip>
         </template>
         <template #item.name="{ item }">
-          <span class="report-name">{{ item.name }}</span>
+          <span class="font-weight-medium">{{ item.name }}</span>
         </template>
         <template #item.actions="{ item }">
           <!-- @click.stop so using the actions menu doesn't also trigger the
                row-click edit handler. -->
           <v-menu location="bottom end" @click.stop>
             <template #activator="{ props }">
-              <v-btn v-bind="props" icon="mdi-dots-vertical" variant="text"
-                     size="small" color="medium-emphasis" title="Actions"
+              <v-btn v-bind="props" :icon="mdiDotsVertical" variant="text"
+                     size="small" aria-label="Report actions" title="Actions"
                      @click.stop />
             </template>
-            <v-list density="compact" min-width="180">
+            <v-list min-width="180">
               <v-list-item v-for="a in rowActions(item.raw)" :key="a.title" @click="a.fn()">
                 <template #prepend>
                   <v-icon :icon="a.icon" :color="a.color" size="20" />
@@ -187,45 +198,60 @@ async function confirmDelete(r) {
     </v-card>
 
     <!-- Summary-group stats -->
-    <v-card border flat class="pa-4" style="border-top:1px solid #cbd5e0">
-      <div class="text-overline mb-2" style="color:#1f3a5f">Summary Group</div>
-      <div class="d-flex ga-10 flex-wrap mb-3">
-        <div>
-          <div class="text-h4" style="color:#1f3a5f;font-weight:800">
-            {{ app.summaryGroupAverage.value == null ? "—" : Calc.fmt(app.summaryGroupAverage.value, 2) }}
+    <v-card>
+      <div class="salt-band">Summary Group</div>
+      <div class="pa-4">
+        <div class="d-flex ga-10 flex-wrap mb-4">
+          <div>
+            <div class="salt-stat text-h4">
+              {{ app.summaryGroupAverage.value == null ? "—" : Calc.fmt(app.summaryGroupAverage.value, 2) }}
+            </div>
+            <span class="salt-eyebrow mt-1">Summary group average</span>
           </div>
-          <div class="text-caption text-medium-emphasis">SUMMARY GROUP AVERAGE</div>
-        </div>
-        <div>
-          <div class="text-h4" style="color:#1f3a5f;font-weight:800">
-            {{ app.rsca.value == null ? "—" : Calc.fmt(app.rsca.value, 2) }}
+          <div>
+            <div class="salt-stat text-h4">
+              {{ app.rsca.value == null ? "—" : Calc.fmt(app.rsca.value, 2) }}
+            </div>
+            <span class="salt-eyebrow mt-1">RSCA</span>
           </div>
-          <div class="text-caption text-medium-emphasis">RSCA</div>
+          <div>
+            <div class="salt-stat text-h4">{{ app.state.reports.length }}</div>
+            <span class="salt-eyebrow mt-1">Reports</span>
+          </div>
         </div>
-        <div>
-          <div class="text-h4" style="color:#1f3a5f;font-weight:800">{{ app.state.reports.length }}</div>
-          <div class="text-caption text-medium-emphasis">REPORTS</div>
-        </div>
-      </div>
-      <div class="text-caption text-medium-emphasis mb-1">Promotion Summary (Block 43)</div>
-      <div class="d-inline-flex" style="border:1px solid #cbd5e0">
-        <div v-for="(c, i) in promCells" :key="c.label" class="text-center px-4 py-1"
-             :style="i ? 'border-left:1px solid #cbd5e0' : ''">
-          <div class="text-caption text-medium-emphasis">{{ c.label }}</div>
-          <div class="text-h6" style="color:#1f3a5f;font-weight:700">{{ c.n }}</div>
+
+        <span class="salt-eyebrow mb-2">Promotion summary (Block 43)</span>
+        <!-- A real table rather than divs: six labelled counts ARE tabular data,
+             and .salt-table already rules them the way the form does. -->
+        <div class="salt-scroll-x d-inline-block">
+          <table class="salt-table prom-table">
+            <caption class="sr-only">Promotion recommendation counts for this summary group</caption>
+            <thead>
+              <tr>
+                <th v-for="c in promCells" :key="c.label" scope="col">{{ c.label }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td v-for="c in promCells" :key="c.label" class="mono text-center">{{ c.n }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </v-card>
   </div>
 
-  <v-card v-else flat class="pa-6 text-medium-emphasis">
-    Select or create a summary group.
+  <v-card v-else class="pa-6">
+    <span class="text-body-2" style="opacity: 0.7">Select or create a summary group.</span>
   </v-card>
 </template>
 
 <style scoped>
-/* Row actions live in a single overflow (kebab) menu at the end of each row. */
-.report-name { font-weight: 500; }
 /* The whole row is clickable (opens Edit), so show a pointer over data rows. */
-.reports-table :deep(tbody tr) { cursor: pointer; }
+.salt-data-table :deep(tbody tr) { cursor: pointer; }
+/* Counts read as a row of cells, so each column gets the same footprint rather
+   than shrink-wrapping to the width of its digits. */
+.prom-table th,
+.prom-table td { min-width: 4.5rem; text-align: center; }
 </style>
