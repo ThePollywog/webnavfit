@@ -1,6 +1,6 @@
 {
   "name": "webnavfit",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Browser-based reconstruction of NAVFIT98A — prepare U.S. Navy FITREP/EVAL/Chief evaluations and print the official NAVPERS 1610/2 form. 100% client-side, no server.",
   "license": "MIT",
   "type": "module",
