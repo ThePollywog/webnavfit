@@ -2,13 +2,151 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- viewport-fit=cover lets the layout reach into the notch/home-indicator
+         area; .salt-safe-bottom pads the footer back out of it. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>WEBNAVFIT — Navy FITREP &amp; EVAL Preparation (NAVFIT98A in your browser)</title>
     <meta
       name="description"
-      content="Prepare U.S. Navy FITREP, EVAL, and Chief evaluations and print the official NAVPERS 1610/2 form. Runs entirely in your browser."
+      content="Free browser-based NAVFIT98A: prepare U.S. Navy FITREP, EVAL, and Chief Eval reports, see live trait averages and RSCA, and print the official NAVPERS 1610/2 form. No install, no server, nothing uploaded."
     />
+    <!-- Google has ignored the keywords meta since 2009; it is kept because
+         Bing and several smaller crawlers still read it, and it costs 300 bytes.
+         The terms that actually do the work are in the title, description and
+         the JSON-LD block below. -->
+    <meta
+      name="keywords"
+      content="salt dog, saltdog, pollywog, thepollywog, webnavfit, navy, US Navy, FITREP, fitness report, EVAL, evaluation, Chief Eval, enlisted evaluation, NAVFIT98A, NAVFIT, eNavFit, NAVPERS 1610/2, NAVPERS 1616/26, NAVPERS 1616/27, BUPERSINST 1610.10, EVALMAN, performance evaluation, reporting senior, summary group, RSCA, trait average, promotion recommendation, early promote, must promote, block 41 comments, Navy Reserve, SELRES, sailor"
+    />
+    <meta name="author" content="ThePollywog" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://thepollywog.github.io/webnavfit/" />
+
+    <!-- Icons. The SVG is the source of truth and scales to any size; the .ico
+         covers browsers that ignore it, and the 180px PNG is what iOS uses for
+         a home-screen tile. Paths are relative because vite's base is "./" so
+         the build works under the GitHub Pages subpath. -->
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="./favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+
     <meta name="color-scheme" content="light dark" />
-    <title>WEBNAVFIT — Navy Evaluation Report System</title>
+    <!-- Matches the two theme backgrounds in plugins/vuetify.js, so the mobile
+         browser chrome continues the app instead of framing it. -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F6FA" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0A1628" />
+    <meta name="apple-mobile-web-app-title" content="WEBNAVFIT" />
+
+    <!-- Link previews. og:image and og:url must be absolute, so they name the
+         deployed origin rather than a relative path. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="WEBNAVFIT" />
+    <meta property="og:title" content="WEBNAVFIT — Navy Evaluation Report System" />
+    <meta
+      property="og:description"
+      content="Prepare FITREP, EVAL, and Chief Eval reports and print the official NAVPERS 1610/2 form. Runs entirely in your browser; nothing is uploaded."
+    />
+    <meta property="og:url" content="https://thepollywog.github.io/webnavfit/" />
+    <meta property="og:image" content="https://thepollywog.github.io/webnavfit/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="WEBNAVFIT — a browser reconstruction of NAVFIT98A for Navy FITREP and EVAL preparation"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="WEBNAVFIT — Navy Evaluation Report System" />
+    <meta
+      name="twitter:description"
+      content="Prepare FITREP, EVAL, and Chief Eval reports and print the official NAVPERS 1610/2 form. Runs entirely in your browser."
+    />
+    <meta name="twitter:image" content="https://thepollywog.github.io/webnavfit/og-image.png" />
+
+    <!-- Structured data. WebApplication is the type a search engine can act on
+         for a tool like this (it drives the "free", "browser-based" and
+         platform facets); the FAQ entries target the questions people actually
+         search, and are worded to match what the app's own Help dialog says. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebApplication",
+            "@id": "https://thepollywog.github.io/webnavfit/#app",
+            "name": "WEBNAVFIT",
+            "alternateName": "Navy Evaluation Report System",
+            "url": "https://thepollywog.github.io/webnavfit/",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Any (web browser)",
+            "browserRequirements": "Requires JavaScript and a modern browser.",
+            "description": "Browser-based reconstruction of NAVFIT98A. Prepare U.S. Navy FITREP, EVAL, and Chief Eval performance reports with live trait averaging, RSCA, block-43 summary counts, and BUPERS validation, then print the official NAVPERS 1610/2 form. Runs entirely client-side; no data is transmitted.",
+            "inLanguage": "en-US",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+            "image": "https://thepollywog.github.io/webnavfit/og-image.png",
+            "author": { "@type": "Organization", "name": "ThePollywog" },
+            "keywords": "Navy, FITREP, EVAL, Chief Eval, NAVFIT98A, eNavFit, NAVPERS 1610/2, performance evaluation, reporting senior, summary group, RSCA, Navy Reserve, SELRES",
+            "featureList": [
+              "FITREP, EVAL, and Chief Eval entry with the correct performance traits per report type",
+              "Per-block help drawn from the BUPERSINST 1610.10 series",
+              "Live member trait average, RSCA, and block-43 promotion summary",
+              "Validation against BUPERS rules as you type",
+              "Exact NAVPERS 1610/2 PDF output",
+              "Click-to-edit form canvas with draggable text and signature annotations",
+              "Works offline; data stays in your browser"
+            ],
+            "isRelatedTo": {
+              "@type": "WebApplication",
+              "name": "SALTDOG",
+              "alternateName": "Salt Dog",
+              "url": "https://thepollywog.github.io/saltdog/",
+              "description": "Navy Reserve quick links, knowledge references, and readiness tools for SELRES."
+            }
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://thepollywog.github.io/webnavfit/#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Is WEBNAVFIT an official Navy application?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. WEBNAVFIT is an unofficial preparation aid and is not affiliated with or endorsed by the U.S. Navy or BUPERS. The system of record remains eNavFit / NAVFIT98A. Do not enter classified information."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Is my FITREP or EVAL data uploaded anywhere?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "No. WEBNAVFIT runs entirely in your browser and stores reports locally in browser storage. There is no server and nothing is transmitted. File ▸ Export saves a portable .json backup you control."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Can I print the official NAVPERS 1610/2 form?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Yes. WEBNAVFIT draws your data onto the official form at the real eNavFit positions and sizes and exports it as a PDF, either one report at a time or the whole summary group as a single file."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "How do I know what to put in each block of the FITREP?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Every block in the editor has a help button explaining what belongs in it, the expected format, and the mistakes that most often get it returned. The performance traits also show the published 1.0, 3.0, and 5.0 standards for that trait. The guidance summarizes the BUPERSINST 1610.10 series and should be verified against the current instruction."
+                }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WEBNAVFIT sitemap.
+
+  One entry, because the app is a single page: summary groups, the report
+  editor, the form canvas and the lookup tables are all dialogs over the same
+  URL with no routing, so there is nothing else a crawler could fetch. The
+  User Guide and README live on github.com and belong to that origin's sitemap,
+  not this one.
+
+  `lastmod` is maintained by hand — update it when the app changes materially.
+  A sitemap on a GitHub Pages project path is not discovered automatically
+  (see the placement note in robots.txt); submit this URL in Google Search
+  Console and Bing Webmaster Tools.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url>
+    <loc>https://thepollywog.github.io/webnavfit/</loc>
+    <lastmod>2026-08-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://thepollywog.github.io/webnavfit/og-image.png</image:loc>
+      <image:title>WEBNAVFIT — Navy Evaluation Report System</image:title>
+    </image:image>
+  </url>
+</urlset>

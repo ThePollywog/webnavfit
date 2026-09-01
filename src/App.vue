@@ -1,7 +1,10 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
+import { useDisplay } from "vuetify";
 import {
   mdiClipboardTextOutline,
+  mdiDotsVertical,
+  mdiMenu,
   mdiOpenInNew,
   mdiWeatherNight,
   mdiWeatherSunny,
@@ -17,6 +20,30 @@ import FitrepCanvasEditor from "./components/FitrepCanvasEditor.vue";
 
 const app = useAppStore();
 const { isDark, toggle } = useAppTheme();
+
+// Three layout tiers, because the pieces of chrome stop fitting at different
+// widths rather than all at once:
+//   lgAndUp  (1264px) — the drawer can hold a permanent 284px lane. Below it the
+//                       drawer overlays, exactly as SALTDOG's shell does, so the
+//                       first paint on a phone is content rather than a menu.
+//   smAndUp  (600px)  — room for the File/Tools/Help bar and the version badge.
+//                       A tablet in portrait gets the real menus, not a kebab.
+//   mdAndUp  (960px)  — room for prose: the full system name and the footer's
+//                       long disclaimer.
+const { lgAndUp, mdAndUp, smAndUp } = useDisplay();
+
+const drawer = ref(lgAndUp.value);
+watch(lgAndUp, (v) => (drawer.value = v));
+
+// Choosing a group is the drawer's whole purpose, so on a phone — where it
+// covers the content it is selecting — dismiss it once the choice is made.
+// Watching the selection rather than handling the click covers both routes to
+// it: tapping a group, and adding one (store.addFolder selects the new folder
+// itself, so a click handler here would miss that case).
+watch(
+  () => app.state.selectedFolderId,
+  () => { if (!lgAndUp.value) drawer.value = false; }
+);
 
 // Build stamp injected by vite.config.js (`define`). On a Pages deploy this is
 // package version + the incrementing workflow run number; locally, "-dev".
@@ -117,11 +144,26 @@ const menus = [
     <!-- Title bar. Unlike SALTDOG's it keeps the surface colour rather than
          filling with navy: the app bar sits directly above a menu bar and a
          drawer, and three stacked bands of chrome read as heavy when the top one
-         is a solid block. The bottom border does the separating. -->
-    <v-app-bar class="no-print">
-      <v-icon :icon="mdiClipboardTextOutline" size="22" color="primary" class="ms-4" />
-      <div class="d-flex flex-column ms-3">
-        <span class="salt-eyebrow mb-0">Navy Evaluation Report System</span>
+         is a solid block. The bottom border does the separating.
+
+         The menu bar is an app-bar *extension* rather than a second v-app-bar.
+         A second bar has to be pushed down with `top: 64px` and paid for with a
+         matching `--v-layout-top`, both of which are wrong on a phone (bars are
+         56px there, so the two overlap and the content sits under them).
+         Vuetify measures the extension itself, and dropping it below sm shrinks
+         the offset with no arithmetic on our side. -->
+    <v-app-bar class="no-print" :extension-height="smAndUp ? 40 : 0">
+      <v-app-bar-nav-icon
+        :icon="mdiMenu"
+        aria-label="Toggle summary groups"
+        @click="drawer = !drawer"
+      />
+
+      <v-icon :icon="mdiClipboardTextOutline" size="22" color="primary" class="d-none d-sm-flex" />
+      <div class="d-flex flex-column ms-sm-3 overflow-hidden">
+        <!-- The full system name is the first thing to go: it is context, not
+             navigation, and the wordmark below already identifies the app. -->
+        <span class="salt-eyebrow mb-0 d-none d-md-block">Navy Evaluation Report System</span>
         <span class="salt-heading text-h6" style="line-height: 1.1">WEBNAVFIT</span>
       </div>
 
@@ -129,8 +171,11 @@ const menus = [
 
       <!-- Reciprocal link to the companion app (SALTDOG's nav drawer points
            back here). New tab rather than same-tab navigation: an open report
-           editor holds unsaved edits, and leaving the page would discard them. -->
+           editor holds unsaved edits, and leaving the page would discard them.
+           Below lg it keeps the icon and drops the label; the tooltip and
+           aria-label carry the meaning that the text was carrying. -->
       <v-btn
+        v-if="lgAndUp"
         href="https://thepollywog.github.io/saltdog/"
         target="_blank"
         rel="noopener"
@@ -141,8 +186,19 @@ const menus = [
       >
         SALT DOG HOME
       </v-btn>
+      <v-btn
+        v-else
+        href="https://thepollywog.github.io/saltdog/"
+        target="_blank"
+        rel="noopener"
+        variant="text"
+        :icon="mdiOpenInNew"
+        aria-label="SALTDOG home (opens in a new tab)"
+        title="SALTDOG home"
+      />
 
       <v-chip
+        v-if="smAndUp"
         variant="outlined"
         class="mono me-2"
         :title="commit ? `build ${version} (${commit})` : `build ${version}`"
@@ -152,40 +208,61 @@ const menus = [
       <v-btn
         :icon="isDark ? mdiWeatherSunny : mdiWeatherNight"
         variant="text"
-        class="me-1"
         :aria-label="isDark ? 'Switch to light theme' : 'Switch to dark theme'"
         @click="toggle"
       />
-    </v-app-bar>
 
-    <!-- Menu bar -->
-    <v-app-bar density="compact" class="no-print" style="top: 64px">
-      <v-menu v-for="m in menus" :key="m.title">
+      <!-- Below sm the three menus collapse into one overflow, keeping their
+           grouping as subheaders so File/Tools/Help stay distinguishable. -->
+      <v-menu v-if="!smAndUp">
         <template #activator="{ props }">
-          <v-btn v-bind="props" variant="text" size="small" class="salt-menu-btn">
-            {{ m.title }}
-          </v-btn>
+          <v-btn v-bind="props" :icon="mdiDotsVertical" variant="text" aria-label="Menu" />
         </template>
-        <v-list>
-          <v-list-item v-for="it in m.items" :key="it.title" @click="it.action">
-            <v-list-item-title>{{ it.title }}</v-list-item-title>
-          </v-list-item>
+        <v-list min-width="240" density="compact">
+          <template v-for="(m, mi) in menus" :key="m.title">
+            <v-divider v-if="mi > 0" class="my-1" />
+            <v-list-subheader class="salt-eyebrow">{{ m.title }}</v-list-subheader>
+            <v-list-item v-for="it in m.items" :key="it.title" @click="it.action">
+              <v-list-item-title>{{ it.title }}</v-list-item-title>
+            </v-list-item>
+          </template>
         </v-list>
       </v-menu>
-      <input ref="fileInput" type="file" accept="application/json" style="display: none" @change="onFilePicked" />
-      <input ref="pdfInput" type="file" accept="application/pdf" style="display: none" @change="onPdfPicked" />
+
+      <template v-if="smAndUp" #extension>
+        <div class="d-flex align-center px-2 menu-bar">
+          <v-menu v-for="m in menus" :key="m.title">
+            <template #activator="{ props }">
+              <v-btn v-bind="props" variant="text" size="small" class="salt-menu-btn">
+                {{ m.title }}
+              </v-btn>
+            </template>
+            <v-list>
+              <v-list-item v-for="it in m.items" :key="it.title" @click="it.action">
+                <v-list-item-title>{{ it.title }}</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+        </div>
+      </template>
     </v-app-bar>
 
-    <!-- Folder tree (summary groups) -->
-    <v-navigation-drawer permanent :width="284" class="no-print">
+    <!-- Hidden file inputs. Outside the app bar so collapsing the menu bar on a
+         phone can't unmount the very refs the menu actions click. -->
+    <input ref="fileInput" type="file" accept="application/json" style="display: none" @change="onFilePicked" />
+    <input ref="pdfInput" type="file" accept="application/pdf" style="display: none" @change="onPdfPicked" />
+
+    <!-- Folder tree (summary groups). Temporary (overlay) below lg: 284px is
+         three-quarters of a phone screen, so it cannot hold a lane there. -->
+    <v-navigation-drawer v-model="drawer" :permanent="lgAndUp" :temporary="!lgAndUp" :width="284" class="no-print">
       <FolderTree @select="app.selectFolder" @open-report="openEditor" />
     </v-navigation-drawer>
 
     <!-- Main content -->
-    <v-main style="--v-layout-top: 112px">
+    <v-main>
       <!-- tabindex="-1" so the skip link can move focus here, not just scroll. -->
       <main id="main" tabindex="-1" class="salt-section">
-        <v-container fluid class="py-6">
+        <v-container fluid class="py-4 py-sm-6 px-3 px-sm-4">
           <ReportList
             @new-report="newReport"
             @edit="openEditor"
@@ -196,15 +273,21 @@ const menus = [
       </main>
     </v-main>
 
-    <!-- Status bar -->
-    <v-footer app border class="no-print py-1">
+    <!-- Status bar. The disclaimer is legally load-bearing but it is four lines
+         of caption on a phone, which is a third of the viewport for text nobody
+         re-reads. Below md it keeps the "unofficial" clause and the About
+         dialog carries the rest. -->
+    <v-footer app border class="no-print py-1 salt-safe-bottom">
       <span class="text-caption" style="opacity: 0.7">
         {{ app.state.loading ? "Loading…" : "Ready" }}
         <template v-if="app.selectedFolder.value">
           — {{ app.selectedFolder.value.FolderName }} ({{ app.state.reports.length }} report{{ app.state.reports.length === 1 ? "" : "s" }})
         </template>
-        · unofficial preparation aid, not a Department of the Navy publication.
-        Runs entirely in your browser; no data is transmitted.
+        <template v-if="mdAndUp">
+          · unofficial preparation aid, not a Department of the Navy publication.
+          Runs entirely in your browser; no data is transmitted.
+        </template>
+        <template v-else> · unofficial aid · offline</template>
       </span>
     </v-footer>
 
@@ -239,7 +322,7 @@ const menus = [
       @close="closeCanvas"
     />
 
-    <v-dialog v-model="showHowTo" max-width="640">
+    <v-dialog v-model="showHowTo" max-width="640" scrollable :fullscreen="!mdAndUp">
       <v-card>
         <div class="salt-band">Getting started</div>
         <v-card-title class="salt-heading">How To Use WEBNAVFIT</v-card-title>
@@ -248,6 +331,9 @@ const menus = [
             <li>Add a <b>Summary Group</b> (the <b>+</b> in the left sidebar) for a reporting senior and period.</li>
             <li>Select it, then <b>New FITREP / EVAL / Chief Eval</b> to add a report.</li>
             <li>Fill the report; trait marks drive the live <b>Member Trait Average</b> and validation.</li>
+            <li>Every block has a <b>?</b> beside it explaining what belongs in that box,
+              in what format, and what usually gets it wrong. On the performance traits
+              it shows the published 1.0 / 3.0 / 5.0 standards for that trait.</li>
             <li>On a report row: <b>Preview</b> the official form, <b>Edit</b> the fields,
               <b>Edit on form</b> (click-to-edit the form image + add signatures), or
               <b>Save PDF</b> to download.</li>
@@ -264,7 +350,7 @@ const menus = [
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="showAbout" max-width="520">
+    <v-dialog v-model="showAbout" max-width="520" scrollable>
       <v-card>
         <div class="salt-band">About</div>
         <v-card-text>
@@ -305,5 +391,23 @@ const menus = [
   letter-spacing: 0.1em !important;
   font-size: 0.6875rem;
   font-weight: 700;
+}
+
+/* The extension slot is where the File/Tools/Help bar lives on desktop. It has
+   no border of its own, so it needs the rule the app bar would have drawn. */
+.menu-bar {
+  height: 40px;
+  width: 100%;
+}
+
+/* On a narrow bar the wordmark is the flex item that must yield, or it pushes
+   the action buttons off the right edge instead of truncating itself. */
+@media (max-width: 599px) {
+  .salt-heading.text-h6 {
+    font-size: 1rem !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 </style>

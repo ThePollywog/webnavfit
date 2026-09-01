@@ -1,9 +1,13 @@
 <script setup>
-import { reactive, ref, computed, onMounted } from "vue";
+import { reactive, ref, computed, onMounted, nextTick } from "vue";
+import { useDisplay } from "vuetify";
 import {
   mdiClose,
+  mdiContentSave,
+  mdiDotsVertical,
   mdiDownload,
   mdiFilePdfBox,
+  mdiFitToPageOutline,
   mdiFormTextbox,
   mdiFormatText,
   mdiMagnifyMinusOutline,
@@ -30,9 +34,36 @@ const emit = defineEmits(["close", "save"]);
 // Which system are we in? A report → FITREP form editing; else uploaded-PDF mode.
 const pdfMode = computed(() => !props.report && !!props.pdfBytes);
 
+const { mdAndUp } = useDisplay();
+
 const dialog = ref(true);
 const zoom = ref(1.15);
 const PX = 96 / 72;                 // pt→px at 100%
+
+// Zoom floor is well under the old 0.6: fitting a 612pt page into a 390px phone
+// needs about 0.42, and clamping above that would defeat fit-to-width.
+const ZOOM_MIN = 0.2;
+const ZOOM_MAX = 2;
+const clampZoom = (z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
+
+// The scroll container, measured for fit-to-width.
+const scrollEl = ref(null);
+
+/**
+ * Scale the page so its full width is visible. This is the only sane default on
+ * a phone: at 1.15 a 612pt page is 938px wide, so a 390px screen opens showing
+ * the left third of the form with no indication the rest exists.
+ */
+function fitWidth() {
+  const el = scrollEl.value;
+  const pg = pages.value[0];
+  if (!el || !pg) return;
+  // clientWidth excludes the scrollbar; subtract the container's own padding.
+  const cs = getComputedStyle(el);
+  const pad = parseFloat(cs.paddingLeft || 0) + parseFloat(cs.paddingRight || 0);
+  const avail = el.clientWidth - pad;
+  if (avail > 0) zoom.value = clampZoom(avail / (pg.ptW * PX));
+}
 
 // working copy of the report (FITREP mode); PDF mode carries only annotations.
 const form = reactive(
@@ -89,6 +120,13 @@ onMounted(async () => {
       num: pn, ptW: 612, ptH: 792, bg: `form-bg${pn}.png`,
       widgets: FIELDS.filter((f) => f.page === pn && f.group !== "FormTitle"),
     }));
+  }
+  // Open fitted on anything narrower than a desktop. On desktop 1.15 is a
+  // deliberate slight magnification for reading the form's small print, and the
+  // page already fits, so leave it.
+  if (!mdAndUp.value) {
+    await nextTick();
+    fitWidth();
   }
 });
 
@@ -206,30 +244,43 @@ function deleteAnn(a) {
   if (selectedAnn.value === a.id) selectedAnn.value = null;
 }
 
-// drag handling
+// ---- drag handling ----
+// Pointer events, not mouse events. A touch never emits mousemove/mouseup, so
+// the mouse-only version meant annotations and signatures — the entire point of
+// this editor on a phone — could be placed but never repositioned.
+// setPointerCapture routes every subsequent move to the element we grabbed even
+// when the finger outruns it, which replaces the window-level listeners.
+//
+// Called from two places: the annotation's border, and the .cv-ann-grip handle.
+// Either way `ev.currentTarget` is the capture element and pointermove bubbles
+// from it back up to .cv-ann, so the maths below is the same for both.
 let drag = null;
 function startDrag(a, ev) {
   if (ev.target.tagName === "INPUT") return;   // let the input take focus/typing
   const pg = pageByNum(a.page); if (!pg) return;
   selectedAnn.value = a.id;
-  const pageEl = ev.currentTarget.closest(".cv-page");
-  const rect = pageEl.getBoundingClientRect();
+  const el = ev.currentTarget;
+  const rect = el.closest(".cv-page").getBoundingClientRect();
   const s = PX * zoom.value;
-  drag = { a, pg, rect, s, offX: ev.clientX - (rect.left + a.xPct * pg.ptW * s), offY: ev.clientY - (rect.top + a.yPct * pg.ptH * s) };
-  window.addEventListener("mousemove", onDrag);
-  window.addEventListener("mouseup", endDrag);
+  drag = {
+    a, pg, rect, s, el, id: ev.pointerId,
+    offX: ev.clientX - (rect.left + a.xPct * pg.ptW * s),
+    offY: ev.clientY - (rect.top + a.yPct * pg.ptH * s),
+  };
+  el.setPointerCapture?.(ev.pointerId);
   ev.preventDefault();
 }
 function onDrag(ev) {
-  if (!drag) return;
+  if (!drag || ev.pointerId !== drag.id) return;
   const { a, pg, rect, s, offX, offY } = drag;
   a.xPct = Math.max(0, Math.min(0.98, (ev.clientX - rect.left - offX) / (pg.ptW * s)));
   a.yPct = Math.max(0, Math.min(0.99, (ev.clientY - rect.top - offY) / (pg.ptH * s)));
+  // Stop the page from panning under the finger while it is moving a widget.
+  ev.preventDefault();
 }
-function endDrag() {
+function endDrag(ev) {
+  if (drag && ev?.pointerId !== undefined) drag.el?.releasePointerCapture?.(ev.pointerId);
   drag = null;
-  window.removeEventListener("mousemove", onDrag);
-  window.removeEventListener("mouseup", endDrag);
 }
 
 // ---- save / download ----
@@ -258,8 +309,11 @@ async function saveAndDownload() {
 
 <template>
   <v-dialog v-model="dialog" fullscreen scrollable @after-leave="emit('close')">
-    <v-card class="d-flex flex-column" style="height:100vh">
-      <v-toolbar color="surface" density="comfortable" flat class="cv-bar">
+    <v-card class="d-flex flex-column cv-shell">
+      <!-- Desktop toolbar: title, live average, the two placing modes, zoom,
+           and the two save actions — nine controls, which fits a wide bar and
+           nothing narrower. -->
+      <v-toolbar v-if="mdAndUp" color="surface" density="comfortable" flat class="cv-bar">
         <v-icon :icon="pdfMode ? mdiFilePdfBox : mdiFormTextbox" size="20" color="primary" class="ms-4" />
         <v-toolbar-title class="salt-heading text-subtitle-1 ms-1">{{ title }}
           <span class="text-caption ms-2" style="opacity: 0.7">
@@ -280,9 +334,10 @@ async function saveAndDownload() {
         <v-btn size="small" :variant="placing==='sig' ? 'flat' : 'text'" :color="placing==='sig' ? 'primary' : undefined"
                :prepend-icon="mdiSignatureFreehand" @click="startPlace('sig')">Add Signature</v-btn>
         <v-divider vertical class="mx-2" />
-        <v-btn variant="text" :icon="mdiMagnifyMinusOutline" aria-label="Zoom out" @click="zoom = Math.max(0.6, zoom - 0.15)" />
+        <v-btn variant="text" :icon="mdiMagnifyMinusOutline" aria-label="Zoom out" @click="zoom = clampZoom(zoom - 0.15)" />
         <span class="mono text-caption mx-1">{{ Math.round(zoom*100) }}%</span>
-        <v-btn variant="text" :icon="mdiMagnifyPlusOutline" aria-label="Zoom in" @click="zoom = Math.min(2, zoom + 0.15)" />
+        <v-btn variant="text" :icon="mdiMagnifyPlusOutline" aria-label="Zoom in" @click="zoom = clampZoom(zoom + 0.15)" />
+        <v-btn variant="text" :icon="mdiFitToPageOutline" aria-label="Fit page width" title="Fit width" @click="fitWidth" />
         <v-btn v-if="!pdfMode" variant="tonal" class="ms-3" @click="save(false)">Save</v-btn>
         <v-btn variant="flat" color="primary" class="ms-2" :prepend-icon="mdiDownload" @click="saveAndDownload">
           {{ pdfMode ? "Download PDF" : "Save & PDF" }}
@@ -290,7 +345,58 @@ async function saveAndDownload() {
         <v-btn variant="text" :icon="mdiClose" class="ms-1" aria-label="Close editor" @click="dialog=false" />
       </v-toolbar>
 
-      <div class="cv-scroll">
+      <!-- Phone toolbar: two rows. Row one is identity and exit, row two is the
+           tools you actually reach for while the page is in front of you. Split
+           this way because a single row cannot hold both without either
+           truncating the filename to nothing or dropping the zoom controls,
+           which are what make a 612pt form legible at 390px. -->
+      <template v-else>
+        <v-toolbar color="surface" density="compact" flat>
+          <v-icon :icon="pdfMode ? mdiFilePdfBox : mdiFormTextbox" size="18" color="primary" class="ms-3" />
+          <!-- No v-spacer after the title: it already grows (`flex: 1 1 0%`), and
+               a spacer would split the slack with it, truncating the filename to
+               make room for empty space. -->
+          <v-toolbar-title class="salt-heading text-body-2 ms-1 text-truncate">{{ title }}</v-toolbar-title>
+          <span v-if="!pdfMode" class="text-caption mono me-1">
+            {{ memberAvg == null ? "—" : Calc.fmt(memberAvg,2) }}
+          </span>
+          <v-menu location="bottom end">
+            <template #activator="{ props }">
+              <v-btn v-bind="props" :icon="mdiDotsVertical" variant="text" size="small" aria-label="More actions" />
+            </template>
+            <v-list density="compact" min-width="200">
+              <v-list-item v-if="!pdfMode" @click="save(false)">
+                <template #prepend><v-icon :icon="mdiContentSave" size="20" /></template>
+                <v-list-item-title>Save report</v-list-item-title>
+              </v-list-item>
+              <v-list-item @click="fitWidth">
+                <template #prepend><v-icon :icon="mdiFitToPageOutline" size="20" /></template>
+                <v-list-item-title>Fit width</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+          <v-btn variant="text" size="small" :icon="mdiClose" aria-label="Close editor" @click="dialog=false" />
+        </v-toolbar>
+
+        <v-toolbar color="surface" density="compact" flat class="cv-bar">
+          <v-btn size="small" class="ms-1" :variant="placing==='text' ? 'flat' : 'text'"
+                 :color="placing==='text' ? 'primary' : undefined"
+                 :icon="mdiFormatText" aria-label="Add text" title="Add text" @click="startPlace('text')" />
+          <v-btn size="small" :variant="placing==='sig' ? 'flat' : 'text'"
+                 :color="placing==='sig' ? 'primary' : undefined"
+                 :icon="mdiSignatureFreehand" aria-label="Add signature" title="Add signature" @click="startPlace('sig')" />
+          <v-divider vertical class="mx-1" />
+          <v-btn variant="text" size="small" :icon="mdiMagnifyMinusOutline" aria-label="Zoom out" @click="zoom = clampZoom(zoom - 0.15)" />
+          <span class="mono text-caption" style="min-width: 3.2em; text-align: center">{{ Math.round(zoom*100) }}%</span>
+          <v-btn variant="text" size="small" :icon="mdiMagnifyPlusOutline" aria-label="Zoom in" @click="zoom = clampZoom(zoom + 0.15)" />
+          <v-spacer />
+          <v-btn variant="flat" color="primary" size="small" class="me-1" :prepend-icon="mdiDownload" @click="saveAndDownload">
+            PDF
+          </v-btn>
+        </v-toolbar>
+      </template>
+
+      <div class="cv-scroll" ref="scrollEl">
         <div v-if="loading" class="cv-loading">
           <v-progress-circular indeterminate color="primary" size="42" />
           <div class="mt-3">Rendering PDF…</div>
@@ -368,15 +474,30 @@ async function saveAndDownload() {
           <div v-for="a in annsForPage(pg.num)" :key="a.id"
                class="cv-ann" :class="{ sel: selectedAnn===a.id, sig: a.sig }"
                :style="annStyle(a)"
-               @mousedown.stop="startDrag(a, $event)" @click.stop>
+               @pointerdown.stop="startDrag(a, $event)"
+               @pointermove="onDrag"
+               @pointerup="endDrag"
+               @pointercancel="endDrag"
+               @click.stop>
             <input class="cv-ann-input" :style="{ fontSize: annFontPx(a)+'px' }"
                    :value="a.text" @input="editAnn(a, $event)"
                    @focus="selectedAnn=a.id" />
             <div class="cv-ann-tools" v-if="selectedAnn===a.id">
-              <button class="cv-ann-btn" title="Bigger" @mousedown.stop @click.stop="a.size=(a.size||11)+2">A+</button>
-              <button class="cv-ann-btn" title="Smaller" @mousedown.stop @click.stop="a.size=Math.max(6,(a.size||11)-2)">A−</button>
-              <button v-if="!a.sig" class="cv-ann-btn" title="Bold" :class="{active:a.bold}" @mousedown.stop @click.stop="a.bold=!a.bold">B</button>
-              <button class="cv-ann-btn del" title="Delete" @mousedown.stop @click.stop="deleteAnn(a)">✕</button>
+              <!-- Explicit drag handle. The text input fills the annotation edge
+                   to edge, and startDrag has to ignore INPUT targets or the field
+                   could never be typed in — which left only the 2px border as a
+                   grab area. That is fiddly with a mouse and unhittable with a
+                   finger, so the move affordance gets its own button. Dragging
+                   from here means the annotation rides 34px above the fingertip
+                   instead of underneath it. -->
+              <button class="cv-ann-btn cv-ann-grip" title="Drag to move"
+                      aria-label="Move annotation"
+                      @pointerdown.stop="startDrag(a, $event)"
+                      @mousedown.stop @click.stop>⠿</button>
+              <button class="cv-ann-btn" title="Bigger" @pointerdown.stop @mousedown.stop @click.stop="a.size=(a.size||11)+2">A+</button>
+              <button class="cv-ann-btn" title="Smaller" @pointerdown.stop @mousedown.stop @click.stop="a.size=Math.max(6,(a.size||11)-2)">A−</button>
+              <button v-if="!a.sig" class="cv-ann-btn" title="Bold" :class="{active:a.bold}" @pointerdown.stop @mousedown.stop @click.stop="a.bold=!a.bold">B</button>
+              <button class="cv-ann-btn del" title="Delete" @pointerdown.stop @mousedown.stop @click.stop="deleteAnn(a)">✕</button>
             </div>
           </div>
         </div>
@@ -399,6 +520,12 @@ async function saveAndDownload() {
  * The values are the light theme's navy and green, so light mode is a seamless
  * continuation of the palette and dark mode reads as a lit page on a dark desk.
  */
+/* height:100% rather than 100vh. Vuetify's fullscreen dialog already anchors its
+   content to all four edges, and on mobile Safari 100vh is the *large* viewport
+   — it ignores the URL bar, so the bottom of the page and the zoom controls end
+   up under browser chrome. Filling the parent lets the layout viewport decide. */
+.cv-shell { height: 100%; }
+
 .cv-bar { border-bottom: 2px solid rgb(var(--v-theme-accent)); }
 
 .cv-page,
@@ -509,4 +636,49 @@ async function saveAndDownload() {
 /* Gold for the engaged toggle — the accent, on the one control that has a state. */
 .cv-ann-btn.active { background: #C8A951; color: var(--cv-ink); }
 .cv-ann-btn.del { color: #F08A80; }
+/* The grip is the one button that is dragged rather than clicked, so it needs
+   its own cursor and its own touch-action — the browser decides whether a
+   gesture is a scroll before any pointermove reaches JS. */
+.cv-ann-grip {
+  cursor: grab;
+  touch-action: none;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+.cv-ann-grip:active { cursor: grabbing; }
+
+/* ---- touch / narrow ---- */
+
+/* touch-action: none is what makes dragging an annotation possible at all on a
+   touchscreen. Without it the browser claims the gesture for scrolling the mat
+   before pointermove ever reaches us, and the widget stays put while the page
+   slides. Scoped to the annotation, so one-finger panning still works
+   everywhere else on the page. */
+.cv-ann {
+  touch-action: none;
+}
+
+@media (max-width: 959px) {
+  /* 24px of mat on each side is 12% of a phone's width. The page edge only has
+     to be visible, not generous. */
+  .cv-scroll {
+    padding: 10px;
+    gap: 12px;
+  }
+
+  /* The tool strip sits above a widget that may be near the top of the page,
+     and at 22x20 its buttons are far under a finger's width. Bigger, and
+     below the widget instead of above, where the finger is already resting. */
+  .cv-ann-tools {
+    top: auto;
+    bottom: -34px;
+    gap: 4px;
+    padding: 3px;
+  }
+  .cv-ann-btn {
+    width: 34px;
+    height: 30px;
+    font-size: 13px;
+  }
+}
 </style>

@@ -1,7 +1,10 @@
 <script setup>
+import { useDisplay } from "vuetify";
 import refdata from "../lib/refdata.js";
 defineProps({ modelValue: Boolean });
 defineEmits(["update:modelValue"]);
+
+const { mdAndUp } = useDisplay();
 
 const tables = [
   { title: "Promotion Recommendation Scale", headers: ["Value", "Recommendation"], mono: [0],
@@ -18,7 +21,11 @@ const tables = [
 </script>
 
 <template>
-  <v-dialog :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" max-width="720" scrollable>
+  <!-- Fullscreen below md: these are five expandable lists, and in a boxed
+       dialog on a phone they scroll inside a container that is itself inside a
+       scrolling page. -->
+  <v-dialog :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)"
+            max-width="720" scrollable :fullscreen="!mdAndUp">
     <v-card>
       <div class="salt-band">Reference</div>
       <v-card-title class="salt-heading">Lookup Tables</v-card-title>

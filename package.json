@@ -4,11 +4,23 @@
   "description": "Browser-based reconstruction of NAVFIT98A — prepare U.S. Navy FITREP/EVAL/Chief evaluations and print the official NAVPERS 1610/2 form. 100% client-side, no server.",
   "license": "MIT",
   "type": "module",
-  "homepage": "https://thepollywog.github.io/WEBNAVFIT/",
+  "homepage": "https://thepollywog.github.io/webnavfit/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ThePollywog/WEBNAVFIT.git"
+    "url": "https://github.com/ThePollywog/webnavfit.git"
   },
+  "keywords": [
+    "navy",
+    "fitrep",
+    "eval",
+    "chief-eval",
+    "navfit98a",
+    "enavfit",
+    "navpers-1610-2",
+    "performance-evaluation",
+    "saltdog",
+    "pollywog"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",

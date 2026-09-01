@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img"
+     aria-label="WEBNAVFIT">
+  <title>WEBNAVFIT</title>
+  <!--
+    The app-bar mark (mdiClipboardTextOutline) reduced to a silhouette, in the
+    palette shared with SALTDOG: navy #0A2E5C carries structure, gold #C8A951 is
+    the accent. Deliberately a filled tile rather than an outline — at 16px an
+    outlined clipboard turns to mud, and the opaque navy field reads against
+    both light and dark browser chrome, so no prefers-color-scheme variant is
+    needed (Safari's support for one in an SVG favicon is unreliable anyway).
+
+    The navy bar at y=4.9 is what makes it a clipboard: it separates the clip tab
+    from the body, which would otherwise merge into one gold blob.
+
+    favicon.ico and apple-touch-icon.png are rasterized from this same geometry.
+    If these rects move, regenerate those two as well — a 32-unit viewBox is used
+    precisely so the numbers map 1:1 to a 32px bitmap.
+  -->
+  <rect width="32" height="32" rx="6.5" fill="#0A2E5C"/>
+  <rect x="5" y="5.5" width="22" height="24" rx="3" fill="#C8A951"/>
+  <rect x="10.5" y="1.8" width="11" height="5.8" rx="2.2" fill="#C8A951"/>
+  <rect x="8.8" y="4.9" width="14.4" height="1.8" rx="0.9" fill="#0A2E5C"/>
+  <rect x="8.8" y="10.8" width="14" height="2.2" rx="1.1" fill="#0A2E5C"/>
+  <rect x="8.8" y="16.5" width="14" height="2.2" rx="1.1" fill="#0A2E5C"/>
+  <rect x="8.8" y="22.2" width="8.5" height="2.2" rx="1.1" fill="#0A2E5C"/>
+</svg>

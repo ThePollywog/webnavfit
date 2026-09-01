@@ -6,10 +6,16 @@
  */
 import { ref, computed } from "vue";
 import { mdiCalendarMonthOutline } from "@mdi/js";
+import FieldHelp from "./FieldHelp.vue";
 
 const props = defineProps({
   modelValue: { type: String, default: "" },
   label: { type: String, default: "" },
+  /* A BLOCK_HELP key. The help "?" goes in the *outer* append slot rather than
+     append-inner, where it would sit shoulder to shoulder with the calendar
+     button and give the field two 44px adornments inside a box that is only
+     ~90px wide on a phone. */
+  help: { type: String, default: "" },
 });
 const emit = defineEmits(["update:modelValue"]);
 
@@ -61,7 +67,19 @@ function onText(v) { emit("update:modelValue", v); }
     <template #append-inner>
       <v-menu v-model="menu" :close-on-content-click="false" location="bottom end">
         <template #activator="{ props: menuProps }">
-          <v-icon v-bind="menuProps" :icon="mdiCalendarMonthOutline" style="cursor: pointer" title="Pick a date" />
+          <!-- A button, not a bare v-icon. The icon alone is a 24px target that
+               a finger misses and a keyboard cannot reach; v-btn brings the
+               role, focus ring, and the 44px floor the mobile stylesheet sets. -->
+          <v-btn
+            v-bind="menuProps"
+            :icon="mdiCalendarMonthOutline"
+            variant="text"
+            size="small"
+            density="comfortable"
+            aria-label="Pick a date"
+            title="Pick a date"
+            @mousedown.stop
+          />
         </template>
         <v-date-picker
           v-model="pickerDate"
@@ -70,6 +88,10 @@ function onText(v) { emit("update:modelValue", v); }
           @update:model-value="menu = false"
         />
       </v-menu>
+    </template>
+
+    <template v-if="help" #append>
+      <FieldHelp :id="help" />
     </template>
   </v-text-field>
 </template>

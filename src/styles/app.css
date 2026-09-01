@@ -238,6 +238,101 @@ body,
   min-width: 52px;
 }
 
+/* The grade buttons get the 44px floor on any touch device, not just a narrow
+   one. A tablet in portrait is 820px wide and takes the desktop side-by-side
+   trait layout, but it is still driven with a fingertip — and because the rows
+   stack vertically, a short vertical mis-tap lands on the *next* trait's grade
+   row and marks the wrong trait. `pointer: coarse` asks the question that
+   actually matters here (what is pointing at this?) instead of inferring it from
+   viewport width, which is what the width-based block below has to do. */
+@media (pointer: coarse) {
+  .trait-grade-btn {
+    min-height: 44px;
+  }
+
+  /* Same argument for the field-help "?". It is Vuetify's 28px icon button, which
+     the width block below already grows on a phone — but a tablet in portrait
+     sits above that block's 599px ceiling while still being driven with a thumb,
+     and every one of the form's forty-odd help buttons is 28px there. Two class
+     names to outrank .v-btn--icon.v-btn--size-small, which sets the 28px. */
+  .v-btn--icon.fh-btn {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* ============================================================
+   MOBILE. Everything above is size-agnostic; these are the rules that only
+   a narrow viewport needs.
+   ============================================================ */
+
+/* Safari on iOS inflates text in landscape unless told not to. */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* A fifty-field form on a phone must never scroll sideways as a whole page.
+   Individual wide things (the form canvas, wide tables) opt back in via
+   .salt-scroll-x, which scrolls inside its own box. */
+body {
+  overflow-x: hidden;
+}
+
+@media (max-width: 599px) {
+  body {
+    font-size: 14px;
+  }
+
+  /* iOS Safari zooms the viewport whenever a focused input's text is under
+     16px, and it does not zoom back out. In a form this long that turns every
+     field tap into a pinch-to-recover. 16px is the documented threshold, so
+     inputs get it on phones only — the desktop compact density is unaffected.
+     Only the control text is bumped; labels and hints keep their scale. */
+  .v-field input,
+  .v-field textarea,
+  .v-field .v-field__input,
+  .v-field select {
+    font-size: 16px !important;
+  }
+
+  /* The band's tracking is what makes it read as stamped, but at 11px with
+     0.14em on a 360px screen the longer block titles wrap to three lines. */
+  .salt-band {
+    font-size: 0.625rem;
+    letter-spacing: 0.08em;
+    padding: 7px 10px;
+  }
+
+  .salt-eyebrow {
+    letter-spacing: 0.1em;
+  }
+
+  /* Vuetify's default card padding is generous for a phone; reclaiming 8px per
+     side is a whole extra field column on a 360px screen. */
+  .v-card-text {
+    padding: 12px;
+  }
+
+  /* 44px is the Apple/WCAG 2.5.8 minimum for a touch target. Vuetify's small
+     and x-small buttons come in under it, and this app leans on them for the
+     PFA codes, the trait grades, and the per-row actions. */
+  .v-btn--size-small,
+  .v-btn--size-x-small {
+    min-height: 44px;
+  }
+  .v-btn--icon.v-btn--size-small,
+  .v-btn--icon.v-btn--size-x-small {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* Keep the footer and any bottom-anchored chrome clear of the home indicator on
+   notched phones. Pairs with viewport-fit=cover in index.html. */
+.salt-safe-bottom {
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+}
+
 @media print {
   html,
   body,

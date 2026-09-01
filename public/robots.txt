@@ -1,0 +1,22 @@
+# WEBNAVFIT — https://thepollywog.github.io/webnavfit/
+#
+# Everything here is a static preparation aid; there is no server, no user data,
+# and nothing behind a login, so the whole thing is crawlable.
+#
+# NOTE ON PLACEMENT: crawlers only read robots.txt from the ORIGIN root, i.e.
+# https://thepollywog.github.io/robots.txt. On a GitHub Pages project site this
+# file is published at /webnavfit/robots.txt and is therefore ignored. It is kept
+# for the case where the app moves to its own domain, and because the Sitemap
+# line below documents where the sitemap lives. To have the sitemap honoured on
+# the current URL, submit it directly in Google Search Console / Bing Webmaster
+# Tools, or add it to the robots.txt of the thepollywog.github.io root site.
+
+User-agent: *
+Allow: /
+
+# The form background images are large scans of the NAVPERS form and carry no
+# search value on their own.
+Disallow: /form-bg1.png
+Disallow: /form-bg2.png
+
+Sitemap: https://thepollywog.github.io/webnavfit/sitemap.xml
