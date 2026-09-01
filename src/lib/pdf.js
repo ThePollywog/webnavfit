@@ -167,7 +167,7 @@ async function drawReport(doc, fonts, bgPdfBytes, report, opts) {
   const ASCENT = 0.806;
   // Nudge every field glyph up by 1 full point relative to the calibrated
   // baseline.
-  const PX = 1;
+  const PX = 1.25;
   const baseline = (top, size) => PAGE_H - top - ASCENT * size + PX;
   // The eNavFit data font advances 0.6188 em/char; pdf-lib's StandardFont Courier
   // advances 0.6 em, and pdf-lib 1.17 drawText has NO character-spacing option.
