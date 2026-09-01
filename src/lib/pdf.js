@@ -23,6 +23,18 @@ const TRAIT_GROUPS = ["f33x", "f34x", "f35x", "f36x", "f37x", "f38x", "f39x"];
 const RADIO_GROUPS = TRAIT_GROUPS.concat(["f05x", "f42x", "f46rx"]);
 function isRadio(g) { return RADIO_GROUPS.indexOf(g) !== -1; }
 
+// These boxes on the source template PDF (public/blank-fitrep.pdf) ship with
+// stray content already baked into their cells — an "X" in block 42's NOB,
+// and "0.00"/"0" placeholders in blocks 43 and 45 — present even with
+// nothing merged in (verified against the un-merged background). Left alone,
+// our own value draws on top and either doubles up visibly (block 42) or
+// overlaps character-for-character into a garbled glyph (45's averages,
+// whenever the real value isn't coincidentally "0.00"). Whiting out each box
+// before drawing guarantees only our own value ever shows.
+const BAKED_TEMPLATE_GROUPS = new Set([
+  "f42x", "f43ax", "f43bx", "f43cx", "f43dx", "f43ex", "f45memberx", "f45groupx",
+]);
+
 // ---- name / address composition (matches the on-form layout) ----
 function composeName(ln, fi, mi) {
   let s = ln || "";
@@ -189,6 +201,10 @@ async function drawReport(doc, fonts, bgPdfBytes, report, opts) {
     if (f.group === "FormTitle") continue;
     const page = pages[f.page - 1];
     const size = f.size || 12;
+
+    if (BAKED_TEMPLATE_GROUPS.has(f.group)) {
+      page.drawRectangle({ x: f.x, y: PAGE_H - f.y - f.h, width: f.w, height: f.h, color: rgb(1, 1, 1) });
+    }
 
     if (f.type === "check") {
       const on = isRadio(f.group)
