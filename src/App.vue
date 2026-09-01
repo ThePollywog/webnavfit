@@ -63,8 +63,20 @@ const pdfInput = ref(null);
 const canvasReport = ref(null);   // FITREP mode
 const canvasPdfBytes = ref(null); // PDF mode (Uint8Array)
 const canvasPdfName = ref("document.pdf");
+// Bumped whenever a canvas save lands on the report still open behind it in
+// ReportEditor, so its :key changes and it remounts with the fresh data —
+// ReportEditor otherwise clones props.report into local state once at mount
+// and never re-syncs, so edits made via Preview → Edit on Form would persist
+// to the store but silently vanish from the still-open form underneath.
+const editorRevision = ref(0);
 function openCanvasEditor(report) { canvasPdfBytes.value = null; canvasReport.value = report; }
-function onCanvasSave(updated) { app.saveReport(updated); }
+function onCanvasSave(updated) {
+  app.saveReport(updated);
+  if (editorReport.value && editorReport.value.ReportID === updated.ReportID) {
+    editorReport.value = { ...updated };
+    editorRevision.value++;
+  }
+}
 function closeCanvas() { canvasReport.value = null; canvasPdfBytes.value = null; }
 
 // Open an arbitrary PDF in the canvas editor (annotate / sign / download).
@@ -294,6 +306,7 @@ const menus = [
     <!-- Editor dialog -->
     <ReportEditor
       v-if="editorReport"
+      :key="editorReport.ReportID + ':' + editorRevision"
       :report="editorReport"
       @save="onEditorSave"
       @close="onEditorClose"
