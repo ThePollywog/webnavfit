@@ -17,6 +17,7 @@ import ReportEditor from "./components/ReportEditor.vue";
 import FormPreview from "./components/FormPreview.vue";
 import LookupTables from "./components/LookupTables.vue";
 import FitrepCanvasEditor from "./components/FitrepCanvasEditor.vue";
+import { importFitrepPdf } from "./lib/pdfImport.js";
 
 const app = useAppStore();
 const { isDark, toggle } = useAppTheme();
@@ -58,6 +59,7 @@ const showAbout = ref(false);
 const showHowTo = ref(false);
 const fileInput = ref(null);
 const pdfInput = ref(null);
+const importPdfInput = ref(null);
 // The click-to-edit canvas editor is the single PDF editing system. It has two
 // modes: a FITREP report on the official form, or an arbitrary uploaded PDF.
 const canvasReport = ref(null);   // FITREP mode
@@ -87,6 +89,32 @@ async function onPdfPicked(e) {
   canvasReport.value = null;
   canvasPdfName.value = file.name;
   canvasPdfBytes.value = new Uint8Array(await file.arrayBuffer());
+  e.target.value = "";
+}
+
+// Read a real, completed eNavFit-exported FITREP PDF back into a report
+// record. Best-effort text-position extraction (see pdfImport.js) — the
+// result always opens straight in the normal editor for review rather than
+// being trusted blindly, and a flagged-field count is surfaced via toast.
+function openImportPdf() { importPdfInput.value.click(); }
+async function onImportPdfPicked(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const { report: parsed, warnings } = await importFitrepPdf(bytes);
+    const rep = await app.newReportInGroup("FITREP");
+    if (rep) {
+      Object.assign(rep, parsed, { ReportID: rep.ReportID, Parent: rep.Parent });
+      await app.saveReport(rep);
+      openEditor(rep);
+      app.toast(warnings.length
+        ? `Imported — review ${warnings.length} flagged field(s) before saving.`
+        : "FITREP imported.");
+    }
+  } catch (err) {
+    app.toast("Import failed: " + err.message);
+  }
   e.target.value = "";
 }
 
@@ -140,6 +168,7 @@ const menus = [
   { title: "Tools", items: [
     { title: "Auto Summary", action: () => app.autoSummary() },
     { title: "Open PDF…", action: openPdf },
+    { title: "Import Completed FITREP PDF…", action: openImportPdf },
     { title: "Lookup Tables", action: () => (showLookup.value = true) },
   ] },
   { title: "Help", items: [
@@ -263,6 +292,7 @@ const menus = [
          phone can't unmount the very refs the menu actions click. -->
     <input ref="fileInput" type="file" accept="application/json" style="display: none" @change="onFilePicked" />
     <input ref="pdfInput" type="file" accept="application/pdf" style="display: none" @change="onPdfPicked" />
+    <input ref="importPdfInput" type="file" accept="application/pdf" style="display: none" @change="onImportPdfPicked" />
 
     <!-- Folder tree (summary groups). Temporary (overlay) below lg: 284px is
          three-quarters of a phone screen, so it cannot hold a lane there. -->

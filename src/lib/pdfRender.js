@@ -51,3 +51,48 @@ export async function renderPdfPages(bytes, scale = 2) {
   }
   return pages;
 }
+
+/**
+ * Extract every page's text runs with their position converted to the same
+ * TOP-LEFT, points convention used throughout this app (fields-blank.json,
+ * the canvas editor, pdf.js's own field layout) — pdfplumber's "top" measured
+ * from the page top, which is what those coordinates were reverse-engineered
+ * from originally. pdf.js instead hands back a bottom-left-origin transform
+ * per run, so each item is converted here rather than at every call site.
+ *
+ * @param {Uint8Array} bytes  the PDF file bytes
+ * @returns {Promise<Array<Array<{str:string, xTop:number, yTop:number, width:number, height:number}>>>}
+ *          one array per page, in the PDF's own reading order.
+ */
+export async function extractPageTextItems(bytes) {
+  const task = pdfjsLib.getDocument({ data: bytes.slice(0) });
+  const doc = await task.promise;
+  const pages = [];
+  try {
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const { height: pageH } = page.getViewport({ scale: 1 });
+      const content = await page.getTextContent();
+      pages.push(
+        content.items
+          .filter((it) => it.str && it.str.trim() !== "")
+          .map((it) => {
+            // transform: [scaleX, skewX, skewY, scaleY, x, yBaseline] — yBaseline
+            // is bottom-left-origin. "height" approximates the glyph's full
+            // extent, so top ≈ page height − baseline − height is a reasonable
+            // stand-in for pdfplumber's "top" (a small fudge, tuned against a
+            // real sample rather than derived exactly, since pdf.js doesn't
+            // expose per-glyph ascent/descent the way pdfplumber does).
+            const x = it.transform[4];
+            const yBaseline = it.transform[5];
+            const height = it.height || Math.abs(it.transform[3]) || 12;
+            return { str: it.str, xTop: x, yTop: pageH - yBaseline - height, width: it.width || 0, height };
+          })
+      );
+      page.cleanup();
+    }
+  } finally {
+    task.destroy();
+  }
+  return pages;
+}
