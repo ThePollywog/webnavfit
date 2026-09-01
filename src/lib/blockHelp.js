@@ -29,6 +29,21 @@ export const HELP_SOURCE =
   "Summarized from BUPERSINST 1610.10 series and the form instructions. " +
   "Verify against the current instruction before signing.";
 
+// Build the YYMMMDD worked example from today's date (the browser's local
+// clock) instead of a fixed date that goes stale.
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+function todayExample() {
+  const d = new Date();
+  const yy = String(d.getFullYear()).slice(-2);
+  const mmm = MONTH_NAMES[d.getMonth()].slice(0, 3);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const long = `${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+  return `${long} is ${yy}${mmm}${dd}`;
+}
+
 export const BLOCK_HELP = {
   // ---- Block 1-4: member identity ----
   LastName: {
@@ -147,7 +162,7 @@ export const BLOCK_HELP = {
     what:
       "The date the member reported to this command — not the start of this " +
       "reporting period.",
-    format: "YYMMMDD, so 14 October 2023 is 23Oct14.",
+    format: `YYMMMDD, so ${todayExample()}.`,
     watch:
       "This stays the same on every report the command writes on this member. Only " +
       "blocks 14 and 15 move from one report to the next.",
