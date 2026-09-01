@@ -2,12 +2,13 @@
  * pdf.js — generate a real, print-ready NAVPERS 1610/2 PDF.
  *
  * Approach: draw the report data as VECTOR TEXT (pdf-lib StandardFonts.Courier,
- * 10pt, regular, black) on top of a crisp raster of the official blank form
- * (public/form-bg{1,2}.png). Courier == the sample PDF's Courier New 10pt
- * regular, so field text is visually identical (and NOT bold). Field positions
- * come from the official AcroForm widget rectangles (fields-blank.json, PDF points,
- * top-left origin). Generation is fast (~300ms) and produces a clean file with
- * no browser print headers.
+ * 10pt, regular, black) on top of the official blank form, embedded as VECTOR
+ * pages from public/blank-fitrep.pdf (not a raster image), so the background
+ * stays crisp at any zoom/print resolution. Courier == the sample PDF's
+ * Courier New 10pt regular, so field text is visually identical (and NOT
+ * bold). Field positions come from the official AcroForm widget rectangles
+ * (fields-blank.json, PDF points, top-left origin). Generation is fast
+ * (~300ms) and produces a clean file with no browser print headers.
  */
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import FIELDS from "./fields-blank.json";
@@ -139,28 +140,25 @@ function buildValues(r, opts = {}) {
   return { text, checks, radios };
 }
 
-// Cache background PNG bytes (fetched once, copied per use).
+// Cache the blank form's PDF bytes (fetched once, copied per use).
 let bgPromise = null;
 function loadBackgrounds() {
   if (!bgPromise) {
-    bgPromise = Promise.all([
-      fetch("form-bg1.png").then((r) => r.arrayBuffer()),
-      fetch("form-bg2.png").then((r) => r.arrayBuffer()),
-    ]);
+    bgPromise = fetch("blank-fitrep.pdf").then((r) => r.arrayBuffer());
   }
   return bgPromise;
 }
 
 // Draw one report's two pages into an existing PDFDocument.
 // fonts = { courier, bold, sig } embedded once by the caller.
-async function drawReport(doc, fonts, bgPngs, report, opts) {
+async function drawReport(doc, fonts, bgPdfBytes, report, opts) {
   const font = fonts.courier, fontBold = fonts.bold, sigFont = fonts.sig;
   const vals = buildValues(report, opts || {});
-  const pageImgs = [await doc.embedPng(bgPngs[0].slice(0)), await doc.embedPng(bgPngs[1].slice(0))];
+  const [bgPage1, bgPage2] = await doc.embedPdf(bgPdfBytes.slice(0), [0, 1]);
 
   const pages = [doc.addPage([PAGE_W, PAGE_H]), doc.addPage([PAGE_W, PAGE_H])];
-  pages[0].drawImage(pageImgs[0], { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
-  pages[1].drawImage(pageImgs[1], { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+  pages[0].drawPage(bgPage1, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
+  pages[1].drawPage(bgPage2, { x: 0, y: 0, width: PAGE_W, height: PAGE_H });
 
   // Field `y` is the GLYPH TOP measured from the page top (matching the real
   // eNavFit output via pdfplumber). pdf-lib positions by baseline from the
@@ -264,18 +262,18 @@ async function embedFonts(doc) {
 }
 
 export async function reportPdfBytes(report, opts) {
-  const bgPngs = await loadBackgrounds();
+  const bgPdfBytes = await loadBackgrounds();
   const doc = await PDFDocument.create();
   const fonts = await embedFonts(doc);
-  await drawReport(doc, fonts, bgPngs, report, opts);
+  await drawReport(doc, fonts, bgPdfBytes, report, opts);
   return doc.save();
 }
 
 export async function groupPdfBytes(reports, opts = {}) {
-  const bgPngs = await loadBackgrounds();
+  const bgPdfBytes = await loadBackgrounds();
   const doc = await PDFDocument.create();
   const fonts = await embedFonts(doc);
-  for (const r of reports) await drawReport(doc, fonts, bgPngs, r, opts);
+  for (const r of reports) await drawReport(doc, fonts, bgPdfBytes, r, opts);
   return doc.save();
 }
 
