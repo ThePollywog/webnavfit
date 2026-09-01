@@ -5,14 +5,12 @@ import vuetify from "vite-plugin-vuetify";
 
 const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
-// Build stamp. The GitHub Pages workflow exports GITHUB_RUN_NUMBER (a counter
-// that increments on every run) and GITHUB_SHA, so each deployment gets a
-// distinct, monotonically increasing build number without committing a bump —
-// the workflow only has `contents: read`. Locally these are unset and the
-// version reads "1.0.0-dev".
-const runNumber = process.env.GITHUB_RUN_NUMBER || "";
+// Build stamp. The GitHub Pages workflow runs `npm version patch` and commits
+// the bump before building, so package.json's version is already a real,
+// distinct semver per deployment — no run-number suffix needed. Locally
+// (where that bump hasn't happened) the version reads "1.0.0-dev".
 const sha = (process.env.GITHUB_SHA || "").slice(0, 7);
-const version = runNumber ? `${pkg.version}.${runNumber}` : `${pkg.version}-dev`;
+const version = process.env.GITHUB_SHA ? pkg.version : `${pkg.version}-dev`;
 
 // Vue 3 + Vuetify 3 build for the NAVFIT98A web app.
 export default defineConfig({

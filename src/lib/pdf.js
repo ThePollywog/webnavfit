@@ -203,11 +203,14 @@ async function drawReport(doc, fonts, bgPdfBytes, report, opts) {
     const size = f.size || 12;
 
     if (BAKED_TEMPLATE_GROUPS.has(f.group)) {
-      // f.h reaches to (or past) the cell's own bottom grid line for these
-      // boxes, so whiting out the full height clipped that line. Trim 2pt off
-      // the bottom — comfortably clear of the baked placeholder glyph, which
-      // sits nearer the box's top — so the rule stays intact.
-      const wh = Math.max(1, f.h - 2);
+      // f.h reaches to (or past) the cell's own bottom grid line for the text
+      // boxes (43/45) — measured, the rule sits ~10.3pt below f.y, not the
+      // full 14, so a 2pt trim still clipped it; 4pt clears it. Block 42's
+      // checkbox is much shorter (h=12.2) and isn't near a border, but a 4pt
+      // trim there under-covers the box and re-exposes the baked NOB glyph's
+      // tail underneath our own mark, so it keeps the smaller trim.
+      const trim = f.type === "check" ? 2 : 4;
+      const wh = Math.max(1, f.h - trim);
       page.drawRectangle({ x: f.x, y: PAGE_H - f.y - wh, width: f.w, height: wh, color: rgb(1, 1, 1) });
     }
 
