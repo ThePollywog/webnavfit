@@ -10,7 +10,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -32,10 +32,21 @@ jobs:
 
       - run: npm ci
 
+      # Bump package.json's patch version and commit it back to main so the
+      # release history is a real, permanent semver progression (not just a
+      # display-only build stamp). "[skip ci]" in the commit message keeps
+      # this push from re-triggering the workflow on itself.
+      - name: Bump patch version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          npm version patch -m "chore: bump version to %s [skip ci]"
+          git push origin HEAD:main --follow-tags
+
       # vite base is "./" (relative), so the build works under the Pages subpath.
       # GITHUB_RUN_NUMBER increments on every workflow run, so vite.config.js
-      # stamps each deployment with a new version (e.g. 1.0.0.42) that shows in
-      # the navbar. No commit needed — this job only has `contents: read`.
+      # further stamps each deployment with a build number (e.g. 1.0.1.42)
+      # that shows in the navbar, on top of the semver patch bump above.
       - run: npm run build
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}

@@ -102,7 +102,7 @@ export const BLOCK_HELP = {
     what:
       "The member's 10-digit DoD ID number, printed on their CAC. This is what " +
       "routes the report to the correct record.",
-    format: "10 digits, no dashes or spaces.",
+    format: "000-00-0000.",
     watch:
       "Current forms take the DoD ID, not the SSN. Do not enter a Social Security " +
       "number on a report you intend to submit.",
@@ -310,7 +310,7 @@ export const BLOCK_HELP = {
     what:
       "The reporting senior's 10-digit DoD ID. This is what ties the report to the " +
       "reporting senior's cumulative average across everyone they report on.",
-    format: "10 digits.",
+    format: "000-00-0000.",
     watch:
       "An inconsistent ID across a reporting senior's reports breaks their running " +
       "average, so it must match on every report they sign.",

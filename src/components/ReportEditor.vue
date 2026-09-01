@@ -232,7 +232,7 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
                 </v-text-field>
               </v-col>
               <v-col cols="12" md="4">
-                <v-text-field v-model="form.SSN" label="4. DoD ID / SSN" maxlength="10">
+                <v-text-field v-model="form.SSN" label="4. DoD ID / SSN" maxlength="11">
                   <template #append><FieldHelp id="SSN" /></template>
                 </v-text-field>
               </v-col>
@@ -361,7 +361,7 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
                 </v-text-field>
               </v-col>
               <v-col cols="6" md="2">
-                <v-text-field v-model="form.RSSSN" label="27. DoD ID/SSN" maxlength="10">
+                <v-text-field v-model="form.RSSSN" label="27. DoD ID/SSN" maxlength="11">
                   <template #append><FieldHelp id="RSSSN" /></template>
                 </v-text-field>
               </v-col>
@@ -371,11 +371,11 @@ function doPreview() { buildFullName(); emit("preview", { ...form }); }
                    second 44px adornment would leave them barely wider than their own
                    labels. -->
               <v-col cols="12" md="4">
-                <v-text-field v-model="form.RSAddress1" label="44. Address 1" maxlength="30">
+                <v-text-field v-model="form.RSAddress1" label="44. Address 1" maxlength="90">
                   <template #append><FieldHelp id="RSAddress" /></template>
                 </v-text-field>
               </v-col>
-              <v-col cols="12" md="4"><v-text-field v-model="form.RSAddress2" label="Address 2" maxlength="30" /></v-col>
+              <v-col cols="12" md="4"><v-text-field v-model="form.RSAddress2" label="Address 2" maxlength="90" /></v-col>
               <v-col cols="6" md="2"><v-text-field v-model="form.RSCity" label="City" maxlength="15" /></v-col>
               <v-col cols="3" md="1"><v-select v-model="form.RSState" :items="states" label="St" /></v-col>
               <v-col cols="3" md="1"><v-text-field v-model="form.RSZipCd" label="Zip" maxlength="9" /></v-col>

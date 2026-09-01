@@ -66,6 +66,7 @@ const label = computed(() =>
         density="comfortable"
         :aria-label="label"
         :title="label"
+        tabindex="-1"
         @mousedown.stop
       />
     </template>
