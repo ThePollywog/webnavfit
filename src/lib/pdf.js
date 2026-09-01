@@ -203,7 +203,12 @@ async function drawReport(doc, fonts, bgPdfBytes, report, opts) {
     const size = f.size || 12;
 
     if (BAKED_TEMPLATE_GROUPS.has(f.group)) {
-      page.drawRectangle({ x: f.x, y: PAGE_H - f.y - f.h, width: f.w, height: f.h, color: rgb(1, 1, 1) });
+      // f.h reaches to (or past) the cell's own bottom grid line for these
+      // boxes, so whiting out the full height clipped that line. Trim 2pt off
+      // the bottom — comfortably clear of the baked placeholder glyph, which
+      // sits nearer the box's top — so the rule stays intact.
+      const wh = Math.max(1, f.h - 2);
+      page.drawRectangle({ x: f.x, y: PAGE_H - f.y - wh, width: f.w, height: wh, color: rgb(1, 1, 1) });
     }
 
     if (f.type === "check") {
