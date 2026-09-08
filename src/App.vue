@@ -14,9 +14,8 @@ import { useAppTheme } from "./composables/useAppTheme.js";
 import FolderTree from "./components/FolderTree.vue";
 import ReportList from "./components/ReportList.vue";
 import ReportEditor from "./components/ReportEditor.vue";
-import FormPreview from "./components/FormPreview.vue";
 import LookupTables from "./components/LookupTables.vue";
-import FitrepCanvasEditor from "./components/FitrepCanvasEditor.vue";
+import PdfAnnotateEditor from "./components/PdfAnnotateEditor.vue";
 import { importFitrepPdf } from "./lib/pdfImport.js";
 
 const app = useAppStore();
@@ -51,42 +50,28 @@ watch(
 const version = __APP_VERSION__;
 const commit = __APP_COMMIT__;
 
-// editor / preview dialog state
-const editorReport = ref(null);
-const previewReport = ref(null);
+// editor dialog state — ONE workspace for editing a report (Form / Direct
+// Edit / Preview are tabs inside ReportEditor.vue, not separate dialogs), so
+// there is exactly one `v-if` gate and one shared draft regardless of which
+// row action opened it.
+const workspaceReport = ref(null);
+const workspaceTab = ref("form");
 const showLookup = ref(false);
 const showAbout = ref(false);
 const showHowTo = ref(false);
 const fileInput = ref(null);
 const pdfInput = ref(null);
 const importPdfInput = ref(null);
-// The click-to-edit canvas editor is the single PDF editing system. It has two
-// modes: a FITREP report on the official form, or an arbitrary uploaded PDF.
-const canvasReport = ref(null);   // FITREP mode
-const canvasPdfBytes = ref(null); // PDF mode (Uint8Array)
+// Annotate/fill an arbitrary uploaded PDF — unrelated to any report, so it
+// stays a separate tool/dialog rather than folding into the workspace above.
+const canvasPdfBytes = ref(null); // Uint8Array
 const canvasPdfName = ref("document.pdf");
-// Bumped whenever a canvas save lands on the report still open behind it in
-// ReportEditor, so its :key changes and it remounts with the fresh data —
-// ReportEditor otherwise clones props.report into local state once at mount
-// and never re-syncs, so edits made via Preview → Edit on Form would persist
-// to the store but silently vanish from the still-open form underneath.
-const editorRevision = ref(0);
-function openCanvasEditor(report) { canvasPdfBytes.value = null; canvasReport.value = report; }
-function onCanvasSave(updated) {
-  app.saveReport(updated);
-  if (editorReport.value && editorReport.value.ReportID === updated.ReportID) {
-    editorReport.value = { ...updated };
-    editorRevision.value++;
-  }
-}
-function closeCanvas() { canvasReport.value = null; canvasPdfBytes.value = null; }
+function closeCanvas() { canvasPdfBytes.value = null; }
 
-// Open an arbitrary PDF in the canvas editor (annotate / sign / download).
 function openPdf() { pdfInput.value.click(); }
 async function onPdfPicked(e) {
   const file = e.target.files[0];
   if (!file) { return; }
-  canvasReport.value = null;
   canvasPdfName.value = file.name;
   canvasPdfBytes.value = new Uint8Array(await file.arrayBuffer());
   e.target.value = "";
@@ -107,7 +92,7 @@ async function onImportPdfPicked(e) {
     if (rep) {
       Object.assign(rep, parsed, { ReportID: rep.ReportID, Parent: rep.Parent });
       await app.saveReport(rep);
-      openEditor(rep);
+      openWorkspace(rep, "form");
       app.toast(warnings.length
         ? `Imported — review ${warnings.length} flagged field(s) before saving.`
         : "FITREP imported.");
@@ -120,15 +105,12 @@ async function onImportPdfPicked(e) {
 
 onMounted(() => app.init());
 
-function openEditor(report) { editorReport.value = { ...report }; }
-function onEditorSave(updated) { app.saveReport(updated); }
-function onEditorClose() { editorReport.value = null; }
-function openPreview(report) { previewReport.value = report; }
-function closePreview() { previewReport.value = null; }
+function openWorkspace(report, tab = "form") { workspaceReport.value = { ...report }; workspaceTab.value = tab; }
+function closeWorkspace() { workspaceReport.value = null; }
 
 async function newReport(type) {
   const rep = await app.newReportInGroup(type);
-  if (rep) openEditor(rep);
+  if (rep) openWorkspace(rep, "form");
 }
 
 // ---- File menu ----
@@ -164,11 +146,11 @@ const menus = [
     { title: "New Database", action: fileNew },
     { title: "Open / Import (.json)…", action: fileImport },
     { title: "Export (.json)…", action: fileExport },
+    { title: "Import FITREP PDF…", action: openImportPdf },
   ] },
   { title: "Tools", items: [
     { title: "Auto Summary", action: () => app.autoSummary() },
     { title: "Open PDF…", action: openPdf },
-    { title: "Import Completed FITREP PDF…", action: openImportPdf },
     { title: "Lookup Tables", action: () => (showLookup.value = true) },
   ] },
   { title: "Help", items: [
@@ -297,7 +279,7 @@ const menus = [
     <!-- Folder tree (summary groups). Temporary (overlay) below lg: 284px is
          three-quarters of a phone screen, so it cannot hold a lane there. -->
     <v-navigation-drawer v-model="drawer" :permanent="lgAndUp" :temporary="!lgAndUp" :width="284" class="no-print">
-      <FolderTree @select="app.selectFolder" @open-report="openEditor" />
+      <FolderTree @select="app.selectFolder" @open-report="(r) => openWorkspace(r, 'form')" />
     </v-navigation-drawer>
 
     <!-- Main content -->
@@ -307,9 +289,10 @@ const menus = [
         <v-container fluid class="py-4 py-sm-6 px-3 px-sm-4">
           <ReportList
             @new-report="newReport"
-            @edit="openEditor"
-            @preview="openPreview"
-            @edit-pdf="openCanvasEditor"
+            @import-pdf="openImportPdf"
+            @edit="(r) => openWorkspace(r, 'form')"
+            @preview="(r) => openWorkspace(r, 'preview')"
+            @edit-pdf="(r) => openWorkspace(r, 'direct')"
           />
         </v-container>
       </main>
@@ -333,35 +316,24 @@ const menus = [
       </span>
     </v-footer>
 
-    <!-- Editor dialog -->
+    <!-- The one report workspace: Form / Direct Edit / Preview tabs over a
+         single shared draft. Only one of these can ever be open. -->
     <ReportEditor
-      v-if="editorReport"
-      :key="editorReport.ReportID + ':' + editorRevision"
-      :report="editorReport"
-      @save="onEditorSave"
-      @close="onEditorClose"
-      @preview="openPreview"
-    />
-
-    <!-- Full-screen PDF preview (real filled NAVPERS 1610/2) -->
-    <FormPreview
-      v-if="previewReport"
-      :report="previewReport"
-      @close="closePreview"
-      @edit-form="(r) => { closePreview(); openCanvasEditor(r); }"
+      v-if="workspaceReport"
+      :report="workspaceReport"
+      :initial-tab="workspaceTab"
+      @save="app.saveReport"
+      @close="closeWorkspace"
     />
 
     <!-- Lookup / Help / About -->
     <LookupTables v-model="showLookup" />
 
-    <!-- The single PDF editing system: click-to-edit a FITREP on the official
-         form, or annotate/sign an arbitrary uploaded PDF. -->
-    <FitrepCanvasEditor
-      v-if="canvasReport || canvasPdfBytes"
-      :report="canvasReport"
+    <!-- Annotate/sign an arbitrary uploaded PDF — unrelated to any report. -->
+    <PdfAnnotateEditor
+      v-if="canvasPdfBytes"
       :pdf-bytes="canvasPdfBytes"
       :pdf-name="canvasPdfName"
-      @save="onCanvasSave"
       @close="closeCanvas"
     />
 
@@ -378,7 +350,7 @@ const menus = [
               in what format, and what usually gets it wrong. On the performance traits
               it shows the published 1.0 / 3.0 / 5.0 standards for that trait.</li>
             <li>On a report row: <b>Preview</b> the official form, <b>Edit</b> the fields,
-              <b>Edit on form</b> (click-to-edit the form image + add signatures), or
+              <b>Direct Edit</b> (click-to-edit the form image + add signatures), or
               <b>Save PDF</b> to download.</li>
             <li><b>Tools ▸ Auto Summary</b> fills the block-43 counts; <b>Tools ▸ Open PDF…</b>
               opens any PDF to fill its fields and sign it.</li>

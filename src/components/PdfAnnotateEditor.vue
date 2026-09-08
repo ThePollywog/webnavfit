@@ -3,36 +3,30 @@ import { reactive, ref, computed, onMounted, nextTick } from "vue";
 import { useDisplay } from "vuetify";
 import {
   mdiClose,
-  mdiContentSave,
   mdiDotsVertical,
   mdiDownload,
   mdiFilePdfBox,
   mdiFitToPageOutline,
-  mdiFormTextbox,
   mdiFormatText,
   mdiMagnifyMinusOutline,
   mdiMagnifyPlusOutline,
   mdiSignatureFreehand,
 } from "@mdi/js";
-import FIELDS from "../lib/fields-blank.json";
-import * as FF from "../lib/fitrepFields.js";
-import * as Calc from "../lib/calc.js";
-import { REPORT_TYPES } from "../lib/model.js";
-import { reportPdfBytes, stampAnnotations, downloadPdf } from "../lib/pdf.js";
+import { stampAnnotations, downloadPdf } from "../lib/pdf.js";
 import { renderPdfPages } from "../lib/pdfRender.js";
 import { readFormFields, fillFormFields } from "../lib/pdfForm.js";
 
+// Annotate/fill an arbitrary uploaded PDF — sign it, fill its own AcroForm
+// fields if it has any, and drop free-form text/signatures anywhere on the
+// page. Unrelated to any WEBNAVFIT report; that editing surface lives in
+// ReportEditor.vue's "Direct Edit" tab (see ReportCanvasPanel.vue) — this
+// component used to do double duty for both, which is why it isn't called
+// FitrepCanvasEditor any more.
 const props = defineProps({
-  // FITREP mode: edit a report on the official form.
-  report: { type: Object, default: null },
-  // PDF mode: annotate an arbitrary uploaded PDF (Uint8Array).
-  pdfBytes: { type: Object, default: null },
+  pdfBytes: { type: Object, required: true },
   pdfName: { type: String, default: "document.pdf" },
 });
-const emit = defineEmits(["close", "save"]);
-
-// Which system are we in? A report → FITREP form editing; else uploaded-PDF mode.
-const pdfMode = computed(() => !props.report && !!props.pdfBytes);
+const emit = defineEmits(["close"]);
 
 const { mdAndUp } = useDisplay();
 
@@ -65,65 +59,38 @@ function fitWidth() {
   if (avail > 0) zoom.value = clampZoom(avail / (pg.ptW * PX));
 }
 
-// working copy of the report (FITREP mode); PDF mode carries only annotations.
-const form = reactive(
-  props.report ? JSON.parse(JSON.stringify(props.report)) : { _annotations: [] }
-);
+// carries only free-form annotations; there's no report field data here.
+const form = reactive({ _annotations: [] });
 
-// ---- FITREP-mode derived bits ----
-const rt = props.report ? (REPORT_TYPES[form.ReportType] || { label: form.ReportType, form: "" }) : null;
-const memberAvg = computed(() => (props.report ? Calc.memberTraitAverage(form) : null));
-
-// ============================================================
-// PAGES: a unified model so both modes share rendering + annotations.
-// Each page: { num, ptW, ptH, bg (img src), widgets:[] }
-// FITREP mode uses the two official form images (612×792) with form widgets.
-// PDF mode renders the uploaded PDF's pages to images (no widgets).
-// ============================================================
+// Each page: { num, ptW, ptH, bg (img src) }
 const pages = ref([]);
-const loading = ref(pdfMode.value);
+const loading = ref(true);
 const loadErr = ref("");
 
-// ---- uploaded-PDF AcroForm fields (PDF mode) ----
 // pdfFields: [{ name, type, value, options, widgets:[{page,x,y,w,h}] }]
 // pdfFieldValues: reactive { [name]: value } bound to the on-page inputs.
 const pdfFields = ref([]);
 const pdfFieldValues = reactive({});
 const hasPdfForm = computed(() => pdfFields.value.length > 0);
 
-const title = computed(() => {
-  if (pdfMode.value) return props.pdfName || "document.pdf";
-  return (rt ? rt.label : "") + " — " + (FF.readGroup("f01x", form) || "unnamed");
-});
+const title = computed(() => props.pdfName || "document.pdf");
 
 onMounted(async () => {
-  if (pdfMode.value) {
+  try {
+    const rendered = await renderPdfPages(props.pdfBytes, 2);
+    pages.value = rendered.map((p, i) => ({ num: i + 1, ptW: p.ptW, ptH: p.ptH, bg: p.dataUrl }));
+    if (!pages.value.length) loadErr.value = "This PDF has no pages.";
+    // Detect fillable AcroForm fields and seed the editable values.
     try {
-      const rendered = await renderPdfPages(props.pdfBytes, 2);
-      pages.value = rendered.map((p, i) => ({
-        num: i + 1, ptW: p.ptW, ptH: p.ptH, bg: p.dataUrl, widgets: [],
-      }));
-      if (!pages.value.length) loadErr.value = "This PDF has no pages.";
-      // Detect fillable AcroForm fields and seed the editable values.
-      try {
-        const { fields } = await readFormFields(props.pdfBytes);
-        pdfFields.value = fields;
-        fields.forEach((f) => { pdfFieldValues[f.name] = f.value; });
-      } catch { pdfFields.value = []; }
-    } catch (e) {
-      loadErr.value = "Could not open PDF: " + (e.message || e);
-    } finally {
-      loading.value = false;
-    }
-  } else {
-    pages.value = [1, 2].map((pn) => ({
-      num: pn, ptW: 612, ptH: 792, bg: `form-bg${pn}.png`,
-      widgets: FIELDS.filter((f) => f.page === pn && f.group !== "FormTitle"),
-    }));
+      const { fields } = await readFormFields(props.pdfBytes);
+      pdfFields.value = fields;
+      fields.forEach((f) => { pdfFieldValues[f.name] = f.value; });
+    } catch { pdfFields.value = []; }
+  } catch (e) {
+    loadErr.value = "Could not open PDF: " + (e.message || e);
+  } finally {
+    loading.value = false;
   }
-  // Open fitted on anything narrower than a desktop. On desktop 1.15 is a
-  // deliberate slight magnification for reading the form's small print, and the
-  // page already fits, so leave it.
   if (!mdAndUp.value) {
     await nextTick();
     fitWidth();
@@ -146,63 +113,25 @@ function pdfWidgetsOnPage(pn) {
 }
 function pdfFieldFontPx(w) { return Math.max(8, Math.min(15, w.h * PX * zoom.value * 0.62)); }
 
-// convert a widget rect (pt, top-left) to CSS px at current zoom. A field may
-// carry editor-only overrides (editorY/editorH) when its on-screen textarea
-// should sit differently than where the PDF generator draws the text (e.g. a
-// narrative that wraps around an inset box in the PDF).
 function boxStyle(f) {
   const s = PX * zoom.value;
-  const left = (f.editorX != null ? f.editorX : f.x) * s;
-  const top = (f.editorY != null ? f.editorY : f.y) * s;
-  const width = (f.editorW != null ? f.editorW : f.w) * s;
-  const height = (f.editorH != null ? f.editorH : f.h) * s;
   return {
-    left: left + "px", top: top + "px",
-    width: width + "px", height: height + "px",
+    left: f.x * s + "px", top: f.y * s + "px",
+    width: f.w * s + "px", height: f.h * s + "px",
   };
 }
 function pageStyle(pg) {
   const s = PX * zoom.value;
   return { width: pg.ptW * s + "px", height: pg.ptH * s + "px" };
 }
-function fontPx(f) { return (f.size || 12) * PX * zoom.value; }
-// line-height (px) for a multiline field's editable overlay, matching the PDF's
-// per-line pitch so wrapped text in the textarea tracks the generated output.
-function linePx(f) { return (f.pitch || (f.size || 12) + 1.5) * PX * zoom.value; }
-
-// --- per-group helpers (FITREP widgets) ---
-function isText(g) { return !!FF.TEXT_FIELD[g] || g === "f44x" || g === "f47x"; }
-function isCheck(g) { return !!FF.CHECK_FIELD[g]; }
-function isRadio(g) { return FF.isRadioGroup(g); }
-function isMultiline(g) { return FF.MULTILINE.has(g); }
-
-function textVal(g) { return FF.readGroup(g, form); }
-function setText(g, v) { FF.writeGroup(g, form, v); }
-
-function checkOn(g) { return FF.readGroup(g, form) === true; }
-function toggleCheck(g) { FF.writeGroup(g, form, !checkOn(g)); }
-
-function radioOn(f) { return FF.readGroup(f.group, form) === Number(f.on); }
-function selectRadio(f) {
-  const cur = FF.readGroup(f.group, form);
-  FF.writeGroup(f.group, form, cur === Number(f.on) ? -1 : Number(f.on));
-}
-
-function computedBox(g) {
-  if (g === "f45memberx") return Calc.fmt(memberAvg.value, 2);
-  return "";
-}
-
-const activeGroup = ref(null);   // for the helper label
 
 // ============================================================
-// FREE-FORM ANNOTATIONS (draggable text / signatures) — shared by both modes.
+// FREE-FORM ANNOTATIONS (draggable text / signatures).
 // Stored on form._annotations as { id, page, xPct, yPct, text, size, bold, sig }.
 // xPct/yPct are fractions of THAT page (top-left of the text), mapping 1:1 to
-// the PDF generator/stamper regardless of zoom or page size.
+// the PDF stamper regardless of zoom or page size.
 // ============================================================
-if (!Array.isArray(form._annotations)) form._annotations = [];
-let annSeq = form._annotations.reduce((m, a) => Math.max(m, a.id || 0), 0);
+let annSeq = 0;
 
 const placing = ref(null);   // 'text' | 'sig' | null — click a page to drop one
 const selectedAnn = ref(null);
@@ -283,52 +212,33 @@ function endDrag(ev) {
   drag = null;
 }
 
-// ---- save / download ----
+// ---- download ----
 function safeName(s) { return String(s || "document").replace(/[^A-Za-z0-9]+/g, "_"); }
 
-async function save(close) {
-  if (!pdfMode.value) emit("save", JSON.parse(JSON.stringify(form)));
-  if (close) dialog.value = false;
-}
-async function saveAndDownload() {
-  if (pdfMode.value) {
-    // Fill the edited AcroForm fields, then stamp any free-form annotations.
-    let bytes = props.pdfBytes.slice(0);
-    if (hasPdfForm.value) bytes = await fillFormFields(bytes, { ...pdfFieldValues });
-    if (form._annotations.length) bytes = await stampAnnotations(bytes, form._annotations);
-    const base = (props.pdfName || "document.pdf").replace(/\.pdf$/i, "");
-    downloadPdf(bytes, `${safeName(base)}-edited.pdf`);
-    return;
-  }
-  emit("save", JSON.parse(JSON.stringify(form)));
-  const bytes = await reportPdfBytes(form, {});
-  const nm = safeName(FF.readGroup("f01x", form) || "report");
-  downloadPdf(bytes, `NAVPERS_1610-2_${nm}.pdf`);
+async function download() {
+  // Fill the edited AcroForm fields, then stamp any free-form annotations.
+  let bytes = props.pdfBytes.slice(0);
+  if (hasPdfForm.value) bytes = await fillFormFields(bytes, { ...pdfFieldValues });
+  if (form._annotations.length) bytes = await stampAnnotations(bytes, form._annotations);
+  const base = (props.pdfName || "document.pdf").replace(/\.pdf$/i, "");
+  downloadPdf(bytes, `${safeName(base)}-edited.pdf`);
 }
 </script>
 
 <template>
   <v-dialog v-model="dialog" fullscreen scrollable @after-leave="emit('close')">
     <v-card class="d-flex flex-column cv-shell">
-      <!-- Desktop toolbar: title, live average, the two placing modes, zoom,
-           and the two save actions — nine controls, which fits a wide bar and
-           nothing narrower. -->
+      <!-- Desktop toolbar: title, the two placing modes, zoom, and download. -->
       <v-toolbar v-if="mdAndUp" color="surface" density="comfortable" flat class="cv-bar">
-        <v-icon :icon="pdfMode ? mdiFilePdfBox : mdiFormTextbox" size="20" color="primary" class="ms-4" />
+        <v-icon :icon="mdiFilePdfBox" size="20" color="primary" class="ms-4" />
         <v-toolbar-title class="salt-heading text-subtitle-1 ms-1">{{ title }}
           <span class="text-caption ms-2" style="opacity: 0.7">
-            <template v-if="pdfMode">
-              uploaded PDF ·
-              <template v-if="hasPdfForm">edit fields, add text &amp; signatures</template>
-              <template v-else>add text &amp; signatures</template>
-            </template>
-            <template v-else>{{ rt.form }} · click any field to edit</template>
+            uploaded PDF ·
+            <template v-if="hasPdfForm">edit fields, add text &amp; signatures</template>
+            <template v-else>add text &amp; signatures</template>
           </span>
         </v-toolbar-title>
         <v-spacer />
-        <span v-if="!pdfMode" class="text-caption me-3">
-          Member Avg: <b class="mono">{{ memberAvg == null ? "—" : Calc.fmt(memberAvg,2) }}</b>
-        </span>
         <v-btn size="small" :variant="placing==='text' ? 'flat' : 'text'" :color="placing==='text' ? 'primary' : undefined"
                :prepend-icon="mdiFormatText" @click="startPlace('text')">Add Text</v-btn>
         <v-btn size="small" :variant="placing==='sig' ? 'flat' : 'text'" :color="placing==='sig' ? 'primary' : undefined"
@@ -338,36 +248,25 @@ async function saveAndDownload() {
         <span class="mono text-caption mx-1">{{ Math.round(zoom*100) }}%</span>
         <v-btn variant="text" :icon="mdiMagnifyPlusOutline" aria-label="Zoom in" @click="zoom = clampZoom(zoom + 0.15)" />
         <v-btn variant="text" :icon="mdiFitToPageOutline" aria-label="Fit page width" title="Fit width" @click="fitWidth" />
-        <v-btn v-if="!pdfMode" variant="tonal" class="ms-3" @click="save(false)">Save</v-btn>
-        <v-btn variant="flat" color="primary" class="ms-2" :prepend-icon="mdiDownload" @click="saveAndDownload">
-          {{ pdfMode ? "Download PDF" : "Save & PDF" }}
+        <v-btn variant="flat" color="primary" class="ms-2" :prepend-icon="mdiDownload" @click="download">
+          Download PDF
         </v-btn>
         <v-btn variant="text" :icon="mdiClose" class="ms-1" aria-label="Close editor" @click="dialog=false" />
       </v-toolbar>
 
-      <!-- Phone toolbar: two rows. Row one is identity and exit, row two is the
-           tools you actually reach for while the page is in front of you. Split
-           this way because a single row cannot hold both without either
-           truncating the filename to nothing or dropping the zoom controls,
-           which are what make a 612pt form legible at 390px. -->
+      <!-- Phone toolbar: two rows, identity/exit then the tools. -->
       <template v-else>
         <v-toolbar color="surface" density="compact" flat>
-          <v-icon :icon="pdfMode ? mdiFilePdfBox : mdiFormTextbox" size="18" color="primary" class="ms-3" />
-          <!-- No v-spacer after the title: it already grows (`flex: 1 1 0%`), and
-               a spacer would split the slack with it, truncating the filename to
-               make room for empty space. -->
+          <v-icon :icon="mdiFilePdfBox" size="18" color="primary" class="ms-3" />
           <v-toolbar-title class="salt-heading text-body-2 ms-1 text-truncate">{{ title }}</v-toolbar-title>
-          <span v-if="!pdfMode" class="text-caption mono me-1">
-            {{ memberAvg == null ? "—" : Calc.fmt(memberAvg,2) }}
-          </span>
           <v-menu location="bottom end">
             <template #activator="{ props }">
               <v-btn v-bind="props" :icon="mdiDotsVertical" variant="text" size="small" aria-label="More actions" />
             </template>
             <v-list density="compact" min-width="200">
-              <v-list-item v-if="!pdfMode" @click="save(false)">
-                <template #prepend><v-icon :icon="mdiContentSave" size="20" /></template>
-                <v-list-item-title>Save report</v-list-item-title>
+              <v-list-item @click="download">
+                <template #prepend><v-icon :icon="mdiDownload" size="20" /></template>
+                <v-list-item-title>Download PDF</v-list-item-title>
               </v-list-item>
               <v-list-item @click="fitWidth">
                 <template #prepend><v-icon :icon="mdiFitToPageOutline" size="20" /></template>
@@ -390,7 +289,7 @@ async function saveAndDownload() {
           <span class="mono text-caption" style="min-width: 3.2em; text-align: center">{{ Math.round(zoom*100) }}%</span>
           <v-btn variant="text" size="small" :icon="mdiMagnifyPlusOutline" aria-label="Zoom in" @click="zoom = clampZoom(zoom + 0.15)" />
           <v-spacer />
-          <v-btn variant="flat" color="primary" size="small" class="me-1" :prepend-icon="mdiDownload" @click="saveAndDownload">
+          <v-btn variant="flat" color="primary" size="small" class="me-1" :prepend-icon="mdiDownload" @click="download">
             PDF
           </v-btn>
         </v-toolbar>
@@ -404,50 +303,10 @@ async function saveAndDownload() {
         <v-alert v-else-if="loadErr" type="warning" class="ma-6">{{ loadErr }}</v-alert>
 
         <div class="cv-hint" v-if="placing">Click on the page to place the {{ placing==='sig' ? 'signature' : 'text' }}.</div>
-        <div v-else-if="activeGroup" class="cv-hint">{{ FF.LABEL[activeGroup] || activeGroup }}</div>
 
         <div v-for="pg in pages" :key="pg.num" class="cv-page" :class="{ placing: !!placing }" :style="pageStyle(pg)"
              @click="onPageClick(pg.num, $event)">
           <img :src="pg.bg" class="cv-bg" :style="pageStyle(pg)" alt="" draggable="false" />
-
-          <template v-for="f in pg.widgets" :key="f.id">
-            <!-- radio mark (traits, duty status, promotion, statement) -->
-            <div v-if="f.type==='check' && isRadio(f.group)"
-                 class="cv-mark" :class="{ on: radioOn(f) }" :style="boxStyle(f)"
-                 :title="FF.LABEL[f.group] || f.group"
-                 @mouseenter="activeGroup=f.group" @click="selectRadio(f)">
-              <span v-if="radioOn(f)">✕</span>
-            </div>
-
-            <!-- standalone checkbox -->
-            <div v-else-if="f.type==='check' && isCheck(f.group)"
-                 class="cv-mark" :class="{ on: checkOn(f.group) }" :style="boxStyle(f)"
-                 :title="FF.LABEL[f.group] || f.group"
-                 @mouseenter="activeGroup=f.group" @click="toggleCheck(f.group)">
-              <span v-if="checkOn(f.group)">✕</span>
-            </div>
-
-            <!-- computed average box (read-only) -->
-            <div v-else-if="f.group==='f45memberx' || f.group==='f45groupx'"
-                 class="cv-computed" :style="boxStyle(f)">{{ computedBox(f.group) }}</div>
-
-            <!-- multi-line narrative: match the field's true size + line pitch -->
-            <textarea v-else-if="isText(f.group) && isMultiline(f.group)"
-                      class="cv-input cv-area"
-                      :style="[boxStyle(f), { fontSize: fontPx(f)+'px', lineHeight: linePx(f)+'px' }]"
-                      :value="textVal(f.group)"
-                      @focus="activeGroup=f.group"
-                      @input="setText(f.group, $event.target.value)"
-                      :placeholder="FF.LABEL[f.group]||''" />
-
-            <!-- single-line text -->
-            <input v-else-if="isText(f.group)" type="text"
-                   class="cv-input" :style="[boxStyle(f), { fontSize: fontPx(f)+'px' }]"
-                   :value="textVal(f.group)"
-                   @focus="activeGroup=f.group"
-                   @input="setText(f.group, $event.target.value)"
-                   :title="FF.LABEL[f.group]||f.group" />
-          </template>
 
           <!-- uploaded-PDF AcroForm fields: editable inputs on each widget -->
           <template v-for="w in pdfWidgetsOnPage(pg.num)" :key="w.key">
@@ -487,9 +346,7 @@ async function saveAndDownload() {
                    to edge, and startDrag has to ignore INPUT targets or the field
                    could never be typed in — which left only the 2px border as a
                    grab area. That is fiddly with a mouse and unhittable with a
-                   finger, so the move affordance gets its own button. Dragging
-                   from here means the annotation rides 34px above the fingertip
-                   instead of underneath it. -->
+                   finger, so the move affordance gets its own button. -->
               <button class="cv-ann-btn cv-ann-grip" title="Drag to move"
                       aria-label="Move annotation"
                       @pointerdown.stop="startDrag(a, $event)"
@@ -508,14 +365,12 @@ async function saveAndDownload() {
 
 <style scoped>
 /*
- * Two colour systems meet in this component and only one of them is themeable.
- *
  * The chrome (toolbar, alerts, buttons) is theme-driven like the rest of the app.
- * Everything from `--cv-*` down is painted ON a sheet of white paper — the
- * official form image, or a rendered page of someone's PDF — so it is fixed in
- * both themes. Tying the field ink to `on-surface` would put pale grey text on
- * white paper the moment dark mode is on, and the whole point of this editor is
- * that what you see is what the PDF will contain.
+ * Everything from `--cv-*` down is painted ON a sheet of white paper — a rendered
+ * page of the uploaded PDF — so it is fixed in both themes. Tying the field ink
+ * to `on-surface` would put pale grey text on white paper the moment dark mode
+ * is on, and the whole point of this editor is that what you see is what the
+ * downloaded PDF will contain.
  *
  * The values are the light theme's navy and green, so light mode is a seamless
  * continuation of the palette and dark mode reads as a lit page on a dark desk.
@@ -554,37 +409,6 @@ async function saveAndDownload() {
 }
 .cv-page { position: relative; background: #fff; box-shadow: 0 3px 16px rgba(0, 0, 0, 0.5); flex: 0 0 auto; }
 .cv-bg { position: absolute; left: 0; top: 0; user-select: none; pointer-events: none; }
-
-.cv-input {
-  position: absolute; border: 1px solid transparent; background: rgba(var(--cv-edit), 0.06);
-  color: var(--cv-ink); font-family: var(--salt-mono); padding: 0; line-height: 1;
-  outline: none; box-sizing: border-box;
-}
-.cv-input:hover { border-color: rgba(var(--cv-edit), 0.5); background: rgba(var(--cv-edit), 0.12); }
-.cv-input:focus {
-  border-color: var(--cv-ink); background: #fff;
-  box-shadow: 0 0 0 2px rgba(var(--cv-edit), 0.3); z-index: 10;
-}
-/* multiline overlay: font-size + line-height come from inline style (per field);
-   let it scroll if the text exceeds the block height. */
-.cv-area { resize: none; overflow: auto; white-space: pre-wrap; }
-
-.cv-mark {
-  position: absolute; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; color: var(--cv-ink); font-weight: 700; box-sizing: border-box;
-  border: 1px solid transparent;
-}
-.cv-mark:hover { background: rgba(var(--cv-edit), 0.18); border-color: rgba(var(--cv-edit), 0.5); }
-/* A faint wash behind a marked box. The ✕ alone is thin at low zoom, and on a
-   form of forty checkboxes the tint is what makes the selected one findable
-   without reading every glyph. */
-.cv-mark.on { background: rgba(var(--cv-edit), 0.1); }
-.cv-mark span { font-size: 90%; line-height: 1; }
-
-.cv-computed {
-  position: absolute; display: flex; align-items: center; justify-content: center;
-  font-family: var(--salt-mono); color: var(--cv-ink); font-weight: 700; pointer-events: none;
-}
 
 /* Uploaded-PDF AcroForm overlays keep their own green tint. These are fields the
    PDF itself declares, not ones this app placed, and green vs navy is the only

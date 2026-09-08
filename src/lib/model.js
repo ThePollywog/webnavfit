@@ -44,6 +44,12 @@ export function newReport(type, parentFolderId) {
     Achievements: "", Duties: "", PrimaryDuty: "",
     DateCounseled: "", CounselerLN: "", CounselerFI: "", CounselerMI: "",
     PROF: 0, QUAL: 0, EO: 0, MIL: 0, PA: 0, TEAM: 0, LEAD: 0, MIS: 0, TAC: 0,
+    // Per-trait freeform narrative (CHIEF's "Performance Comments" column,
+    // blocks 33-39 — unlike FITREP/EVAL's short DN1-3 comment codes, this is a
+    // full free-text writeup per trait). Grade 0 already means NOB in this
+    // app's convention (see the `grades` UI array), so no separate NOB flag.
+    PROFComments: "", QUALComments: "", EOComments: "", MILComments: "", PAComments: "",
+    TEAMComments: "", LEADComments: "", MISComments: "", TACComments: "",
     PROFDN1: "", PROFDN2: "", PROFDN3: "",
     EODN1: "", EODN2: "", EODN3: "",
     MILDN1: "", MILDN2: "", MILDN3: "",

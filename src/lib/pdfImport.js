@@ -41,6 +41,17 @@ function isMarked(pages, w) {
   });
 }
 
+// The form's own printed captions ("14. From:", "27. SSN", ...) render at a
+// fixed ~7.4-8pt height regardless of which field they sit beside, while every
+// real answer (even the smallest, 9pt narrative text) renders taller. A blank
+// field's nearest text is often its own caption or a neighboring one — always
+// excluding caption-height runs, rather than relying on distance alone, is
+// what tells "genuinely blank" apart from "there's a real value nearby."
+const CAPTION_MAX_HEIGHT = 8.5;
+function dropCaptions(items) {
+  return items.filter((it) => it.height > CAPTION_MAX_HEIGHT);
+}
+
 // Join same-line items left to right. Real exports may hand back whole words
 // as one run or single characters (our own generator draws char-by-char) — a
 // small gap between consecutive runs is treated as a real word space, no gap
@@ -56,18 +67,45 @@ function joinLineItems(items) {
   return out.trim();
 }
 
-function itemsInRow(items, f, padY) {
-  return items.filter((it) => {
-    const midY = it.yTop + it.height / 2;
-    return midY >= f.y - padY && midY <= f.y + f.h + padY;
-  });
+// Real exports lay out each printed line at one shared baseline, so items on
+// the same visual row land at (near-)identical yTop — reliable enough to
+// cluster on directly rather than guessing a fixed y-tolerance. Adjacent
+// fields sit close enough vertically (line pitch ~15-16pt against a ~14pt box
+// height) that a tolerance-range match would often span two real rows at
+// once; picking only the single nearest row avoids that bleed.
+function clusterRows(items) {
+  const sorted = [...items].sort((a, b) => a.yTop - b.yTop);
+  const rows = [];
+  for (const it of sorted) {
+    const last = rows[rows.length - 1];
+    if (last && Math.abs(it.yTop - last.yTop) < 0.75) last.items.push(it);
+    else rows.push({ yTop: it.yTop, items: [it] });
+  }
+  return rows;
+}
+
+function nearestRow(items, f) {
+  const rows = clusterRows(items);
+  const targetMid = f.y + f.h / 2;
+  let best = null, bestDist = Infinity;
+  for (const row of rows) {
+    const rowH = Math.max(...row.items.map((it) => it.height));
+    const mid = row.yTop + rowH / 2;
+    const dist = Math.abs(mid - targetMid);
+    if (dist < bestDist) { best = row; bestDist = dist; }
+  }
+  // Adjacent single-line fields can sit less than one box-height apart, so a
+  // wide tolerance risks claiming a neighbor's answer for an actually-blank
+  // field. Requiring the match to be within roughly half a line keeps each
+  // row attached to at most the one field it visually belongs to.
+  return best && bestDist <= Math.max(6, f.h * 0.6) ? best.items : [];
 }
 
 function extractSingleLine(pages, f) {
-  const items = widgetItems(pages, f).filter(
-    (it) => it.xTop >= f.x - 3 && it.xTop <= f.x + f.w + 30
+  const items = dropCaptions(
+    widgetItems(pages, f).filter((it) => it.xTop >= f.x - 3 && it.xTop <= f.x + f.w + 4)
   );
-  return joinLineItems(itemsInRow(items, f, Math.max(3, f.h * 0.3)));
+  return joinLineItems(nearestRow(items, f));
 }
 
 // Bucket items into pitch-sized lines within the box, then rejoin: a real
@@ -76,8 +114,8 @@ function extractSingleLine(pages, f) {
 // back into flowing text with a single space; a genuinely empty line (a real
 // blank line the writer left) is kept as a paragraph break.
 function extractMultiline(pages, f) {
-  const items = widgetItems(pages, f).filter(
-    (it) => it.xTop >= f.x - 3 && it.xTop <= f.x + f.w + 30
+  const items = dropCaptions(
+    widgetItems(pages, f).filter((it) => it.xTop >= f.x - 3 && it.xTop <= f.x + f.w + 30)
   );
   const pitch = f.pitch || (f.size || 12) + 1.5;
   const maxLines = Math.max(1, Math.round(f.h / pitch) + 1);
@@ -152,7 +190,11 @@ export async function importFitrepPdf(bytes) {
       value = isMultiline ? extractMultiline(pages, w) : extractSingleLine(pages, w);
       if (value) break;
     }
-    if (isMultiline && !value) warnings.push(`${label}: empty — narrative fields are rarely blank on a real report, worth a check.`);
+    // f47x (concurrent reporting senior) is legitimately blank on the vast
+    // majority of reports — only the true narrative blocks are worth flagging.
+    if (isMultiline && !value && group !== "f47x") {
+      warnings.push(`${label}: empty — narrative fields are rarely blank on a real report, worth a check.`);
+    }
     if (value) FF.writeGroup(group, report, value);
   }
 

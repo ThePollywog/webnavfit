@@ -10,6 +10,7 @@ import {
   mdiEyeOutline,
   mdiFileEditOutline,
   mdiFilePdfBox,
+  mdiFileUploadOutline,
   mdiPencil,
   mdiPlus,
 } from "@mdi/js";
@@ -21,7 +22,7 @@ import { reportPdfBytes, groupPdfBytes, downloadPdf } from "../lib/pdf.js";
 import FieldHelp from "./FieldHelp.vue";
 
 const app = useAppStore();
-const emit = defineEmits(["new-report", "edit", "preview", "edit-pdf"]);
+const emit = defineEmits(["new-report", "import-pdf", "edit", "preview", "edit-pdf"]);
 
 // Two separate thresholds, because the table and the button row run out of room
 // at different widths.
@@ -103,7 +104,7 @@ function rowActions(raw) {
   return [
     { title: "Preview", icon: mdiEyeOutline, color: "primary", fn: () => emit("preview", raw) },
     { title: "Edit", icon: mdiPencil, color: "primary", fn: () => emit("edit", raw) },
-    { title: "Edit on form", icon: mdiFileEditOutline, color: "primary", fn: () => editReportPdf(raw) },
+    { title: "Direct Edit (PDF)", icon: mdiFileEditOutline, color: "primary", fn: () => editReportPdf(raw) },
     { title: "Save PDF", icon: mdiFilePdfBox, color: "primary", fn: () => saveReportPdf(raw) },
     { title: "Delete report", icon: mdiDelete, color: "error", fn: () => confirmDelete(raw) },
   ];
@@ -174,6 +175,13 @@ async function confirmDelete(r) {
           </v-list-item>
         </v-list>
       </v-menu>
+
+      <!-- Sits right beside the New-report CTAs: importing a completed FITREP
+           is the other way a report gets into a summary group, so it belongs
+           in the same button row rather than buried in the Tools menu. -->
+      <v-btn variant="outlined" :prepend-icon="mdiFileUploadOutline" @click="emit('import-pdf')">
+        Import FITREP PDF…
+      </v-btn>
 
       <v-btn color="primary" :prepend-icon="mdiFilePdfBox" :loading="savingGroup"
              :disabled="!app.state.reports.length" @click="saveGroupPdf">

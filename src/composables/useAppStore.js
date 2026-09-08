@@ -89,7 +89,15 @@ async function newReportInGroup(type) {
 async function saveReport(report) {
   const rec = { ...report };
   rec.IsValidated = Calc.validate(rec).ok;
-  await db.putReport(rec);
+  try {
+    await db.putReport(rec);
+  } catch (err) {
+    // Callers (ReportEditor's Save button) fire this without awaiting/catching
+    // it themselves, so a rejected write here — e.g. an IndexedDB clone error —
+    // would otherwise vanish as a silent no-op with no sign anything went wrong.
+    toast("Save failed: " + (err.message || err));
+    throw err;
+  }
   await refreshReports();
 }
 async function deleteReport(id) {

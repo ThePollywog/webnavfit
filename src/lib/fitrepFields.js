@@ -77,12 +77,32 @@ export function readGroup(group, report) {
   return "";
 }
 
+// Block 1's printed format is "LAST, FIRST MI SUFFIX" (a comma after the
+// last name, then space-separated given name / middle initial / an optional
+// generational suffix). ReportEditor.vue's own LastName/FirstName/MI/Suffix
+// fields are the source of truth it re-derives FullName from on every save —
+// so writing only LastName here (as this used to) meant a name typed or
+// imported straight into box 1 would have its first name and MI silently
+// wiped the next time the form was opened and saved.
+const NAME_SUFFIXES = new Set(["JR", "SR", "II", "III", "IV", "V", "VI"]);
+function parseName(value) {
+  const [lastRaw, ...rest] = String(value).split(",");
+  const last = lastRaw.trim();
+  const tokens = rest.join(",").trim().split(/\s+/).filter(Boolean);
+  let suffix = "";
+  if (tokens.length > 1 && NAME_SUFFIXES.has(tokens[tokens.length - 1].toUpperCase())) {
+    suffix = tokens.pop();
+  }
+  const [first = "", ...miParts] = tokens;
+  return { LastName: last, FirstName: first, MI: miParts.join(" "), Suffix: suffix };
+}
+
 // --- write a group's value back into the report (mutates) ---
 export function writeGroup(group, report, value) {
   if (TEXT_FIELD[group]) {
     report[TEXT_FIELD[group]] = value;
-    // keep LastName roughly in sync when the name box is edited directly
-    if (group === "f01x" && typeof value === "string") report.LastName = value.split(",")[0].trim();
+    // keep LastName/FirstName/MI/Suffix in sync when the name box is edited directly
+    if (group === "f01x" && typeof value === "string") Object.assign(report, parseName(value));
     return;
   }
   if (CHECK_FIELD[group]) { report[CHECK_FIELD[group]] = !!value; return; }
