@@ -17,6 +17,7 @@ import ReportEditor from "./components/ReportEditor.vue";
 import LookupTables from "./components/LookupTables.vue";
 import PdfAnnotateEditor from "./components/PdfAnnotateEditor.vue";
 import { importFitrepPdf } from "./lib/pdfImport.js";
+import { buildNavfitAccdb, downloadAccdb } from "./lib/navfitAccdb.js";
 
 const app = useAppStore();
 const { isDark, toggle } = useAppTheme();
@@ -128,6 +129,12 @@ async function fileExport() {
   a.href = url; a.download = "navfit98a-export.json"; a.click();
   URL.revokeObjectURL(url);
 }
+async function fileExportAccdb() {
+  try {
+    const data = await app.exportAll();
+    downloadAccdb(await buildNavfitAccdb(data.folders, data.reports), "navfit98a.accdb");
+  } catch (err) { app.toast("Could not build .accdb: " + (err.message || err)); }
+}
 function fileImport() { fileInput.value.click(); }
 async function onFilePicked(e) {
   const file = e.target.files[0];
@@ -146,6 +153,7 @@ const menus = [
     { title: "New Database", action: fileNew },
     { title: "Open / Import (.json)…", action: fileImport },
     { title: "Export (.json)…", action: fileExport },
+    { title: "Export for NAVFIT98A (.accdb)…", action: fileExportAccdb },
     { title: "Import FITREP PDF…", action: openImportPdf },
   ] },
   { title: "Tools", items: [

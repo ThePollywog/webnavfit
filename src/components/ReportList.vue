@@ -5,6 +5,7 @@ import {
   mdiAlertCircleOutline,
   mdiCheckCircleOutline,
   mdiChevronRight,
+  mdiDatabaseExportOutline,
   mdiDelete,
   mdiDotsVertical,
   mdiEyeOutline,
@@ -19,6 +20,7 @@ import * as Calc from "../lib/calc.js";
 import { REPORT_TYPES } from "../lib/model.js";
 import refdata from "../lib/refdata.js";
 import { reportPdfBytes, groupPdfBytes, downloadPdf } from "../lib/pdf.js";
+import { buildNavfitAccdb, downloadAccdb } from "../lib/navfitAccdb.js";
 import FieldHelp from "./FieldHelp.vue";
 
 const app = useAppStore();
@@ -42,6 +44,7 @@ const TABLE_MIN_W = 736;
 const showTable = computed(() => width.value >= TABLE_MIN_W);
 
 const savingGroup = ref(false);
+const savingAccdb = ref(false);
 
 // One entry per New-report type, so the desktop button row and the phone
 // dropdown are generated from the same list.
@@ -85,6 +88,21 @@ async function saveGroupPdf() {
     app.toast("Could not build PDF: " + (e.message || e));
   } finally {
     savingGroup.value = false;
+  }
+}
+
+// Save the summary group as the NAVFIT98A .accdb that accompanies the PDF.
+async function saveGroupAccdb() {
+  if (!app.state.reports.length) { app.toast("No reports to save."); return; }
+  savingAccdb.value = true;
+  try {
+    const folder = app.selectedFolder.value;
+    const bytes = await buildNavfitAccdb([folder], app.state.reports);
+    downloadAccdb(bytes, `${safeName(folder.FolderName)}.accdb`);
+  } catch (e) {
+    app.toast("Could not build .accdb: " + (e.message || e));
+  } finally {
+    savingAccdb.value = false;
   }
 }
 
@@ -186,6 +204,10 @@ async function confirmDelete(r) {
       <v-btn color="primary" :prepend-icon="mdiFilePdfBox" :loading="savingGroup"
              :disabled="!app.state.reports.length" @click="saveGroupPdf">
         Save PDF
+      </v-btn>
+      <v-btn color="primary" variant="tonal" :prepend-icon="mdiDatabaseExportOutline" :loading="savingAccdb"
+             :disabled="!app.state.reports.length" @click="saveGroupAccdb">
+        Save .accdb
       </v-btn>
     </div>
 
